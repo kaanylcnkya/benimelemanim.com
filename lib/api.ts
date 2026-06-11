@@ -1,8 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
-if (!API_URL) {
-  throw new Error("NEXT_PUBLIC_API_URL tanımlı değil.");
-}
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://service.benimelemanim.com/api/v1";
 
 type ApiError = {
   message?: string;
