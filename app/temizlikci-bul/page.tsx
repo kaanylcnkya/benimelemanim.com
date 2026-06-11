@@ -1,8 +1,10 @@
+
 "use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getAuthUser, type AuthUser } from "@/lib/auth";
+import { services } from "@/lib/site";
 import {
   getCities,
   getDistricts,
@@ -146,6 +148,7 @@ export default function FindCleanerPage() {
 
   const [cityId, setCityId] = useState("");
   const [districtId, setDistrictId] = useState("");
+  const [serviceType, setServiceType] = useState("");
 
   const [meta, setMeta] = useState<CleanerPaginationMeta>(emptyMeta);
 
@@ -174,9 +177,19 @@ export default function FindCleanerPage() {
     [districts]
   );
 
+  const serviceOptions = useMemo(
+    () =>
+      services.map((service: string) => ({
+        value: service,
+        label: service,
+      })),
+    []
+  );
+
   function updateCleanerUrl(filters: {
     city_id?: string;
     district_id?: string;
+    service_type?: string;
     page?: string;
   }) {
     if (typeof window === "undefined") return;
@@ -185,6 +198,7 @@ export default function FindCleanerPage() {
 
     if (filters.city_id) params.set("city_id", filters.city_id);
     if (filters.district_id) params.set("district_id", filters.district_id);
+    if (filters.service_type) params.set("service_type", filters.service_type);
     if (filters.page && filters.page !== "1") params.set("page", filters.page);
 
     const query = params.toString();
@@ -201,29 +215,29 @@ export default function FindCleanerPage() {
     customFilters?: {
       city_id?: string;
       district_id?: string;
+      service_type?: string;
     }
   ) {
     try {
       setListLoading(true);
       setError("");
 
-      const selectedCityId = (customFilters?.city_id ?? cityId).trim();
-      const selectedDistrictId = (
-        customFilters?.district_id ?? districtId
-      ).trim();
-
-      updateCleanerUrl({
-        city_id: selectedCityId,
-        district_id: selectedDistrictId,
-        page: String(nextPage),
-      });
-
-      const response = await getCleaners({
-        city_id: selectedCityId,
-        district_id: selectedDistrictId,
+      const finalFilters = {
+        city_id: (customFilters?.city_id ?? cityId).trim(),
+        district_id: (customFilters?.district_id ?? districtId).trim(),
+        service_type: (customFilters?.service_type ?? serviceType).trim(),
         page: String(nextPage),
         per_page: "12",
+      };
+
+      updateCleanerUrl({
+        city_id: finalFilters.city_id,
+        district_id: finalFilters.district_id,
+        service_type: finalFilters.service_type,
+        page: finalFilters.page,
       });
+
+      const response = await getCleaners(finalFilters);
 
       setCleaners(response.data);
       setMeta(response.meta || emptyMeta);
@@ -245,6 +259,7 @@ export default function FindCleanerPage() {
   function clearFilters() {
     setCityId("");
     setDistrictId("");
+    setServiceType("");
     setDistricts([]);
 
     if (typeof window !== "undefined") {
@@ -254,6 +269,7 @@ export default function FindCleanerPage() {
     loadCleaners(1, {
       city_id: "",
       district_id: "",
+      service_type: "",
     });
   }
 
@@ -269,14 +285,17 @@ export default function FindCleanerPage() {
 
     const urlCityId = params.get("city_id") || "";
     const urlDistrictId = params.get("district_id") || "";
-    const urlPage = Number(params.get("page") || "1");
+    const urlServiceType = params.get("service_type") || "";
+    const urlPage = params.get("page") || "1";
 
     setCityId(urlCityId);
     setDistrictId(urlDistrictId);
+    setServiceType(urlServiceType);
 
-    loadCleaners(urlPage, {
+    loadCleaners(Number(urlPage), {
       city_id: urlCityId,
       district_id: urlDistrictId,
+      service_type: urlServiceType,
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -304,6 +323,7 @@ export default function FindCleanerPage() {
     async function loadDistricts() {
       if (!cityId) {
         setDistricts([]);
+        setDistrictId("");
         return;
       }
 
@@ -311,11 +331,14 @@ export default function FindCleanerPage() {
         setDistrictLoading(true);
 
         const currentDistrictId = districtId;
+
         const response = await getDistricts(cityId);
 
         setDistricts(response.data);
 
-        if (!currentDistrictId) return;
+        if (!currentDistrictId) {
+          return;
+        }
 
         const districtExists = response.data.some(
           (district) => String(district.id) === String(currentDistrictId)
@@ -357,9 +380,9 @@ export default function FindCleanerPage() {
               </h1>
 
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
-                Kayıtlı temizlikçileri il ve ilçe bilgisine göre filtreleyin.
-                İletişim bilgilerini görmek için müşteri hesabıyla giriş
-                yapabilirsiniz.
+                Kayıtlı temizlikçileri il, ilçe ve hizmet türüne göre
+                filtreleyin. İletişim bilgilerini görmek için müşteri hesabıyla
+                giriş yapabilirsiniz.
               </p>
             </div>
 
@@ -373,122 +396,57 @@ export default function FindCleanerPage() {
             )}
           </div>
 
-          <div className="mt-8 overflow-visible rounded-[2rem] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)] md:p-5">
-            <div className="mb-4 flex items-start gap-3 rounded-[1.4rem] bg-slate-50 p-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#06264a] text-xl text-white">
-                🔎
-              </div>
+          <div className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)] md:p-5">
+            <div className="grid gap-3 md:grid-cols-5">
+              <SearchableSelect
+                value={cityId}
+                onChange={(value) => {
+                  setCityId(value);
+                  setDistrictId("");
+                }}
+                options={cityOptions}
+                placeholder={cityLoading ? "İller yükleniyor..." : "Tüm İller"}
+                searchPlaceholder="İl ara..."
+                disabled={cityLoading}
+              />
 
-              <div>
-                <h2 className="text-base font-black tracking-[-0.03em] text-[#06264a]">
-                  Filtrele
-                </h2>
+              <SearchableSelect
+                value={districtId}
+                onChange={setDistrictId}
+                options={districtOptions}
+                placeholder={
+                  districtLoading ? "İlçeler yükleniyor..." : "Tüm İlçeler"
+                }
+                searchPlaceholder="İlçe ara..."
+                disabled={!cityId || districtLoading}
+              />
 
-                <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
-                  İl ve ilçe seçerek size yakın temizlikçileri listeleyin.
-                </p>
-              </div>
+              <SearchableSelect
+                value={serviceType}
+                onChange={setServiceType}
+                options={serviceOptions}
+                placeholder="Tüm Hizmetler"
+                searchPlaceholder="Hizmet ara..."
+              />
+
+              <button
+                type="button"
+                onClick={() => loadCleaners(1)}
+                disabled={listLoading}
+                className="min-h-12 cursor-pointer rounded-2xl bg-[#06264a] px-5 text-sm font-black text-white transition hover:bg-[#0b355f] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Temizlikçi Getir
+              </button>
+
+              <button
+                type="button"
+                onClick={clearFilters}
+                disabled={listLoading}
+                className="min-h-12 cursor-pointer rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-[#06264a] transition hover:border-[#f6a313] hover:text-[#f6a313] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Filtreyi Temizle
+              </button>
             </div>
-
-            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto_auto]">
-              <div className="grid gap-2">
-                <label className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                  İl
-                </label>
-
-                <SearchableSelect
-                  value={cityId}
-                  onChange={(value) => {
-                    setCityId(value);
-                    setDistrictId("");
-
-                    loadCleaners(1, {
-                      city_id: value,
-                      district_id: "",
-                    });
-                  }}
-                  options={cityOptions}
-                  placeholder={cityLoading ? "İller yükleniyor..." : "Tüm İller"}
-                  searchPlaceholder="İl ara..."
-                  disabled={cityLoading}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <label className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                  İlçe
-                </label>
-
-                <SearchableSelect
-                  value={districtId}
-                  onChange={(value) => {
-                    setDistrictId(value);
-
-                    loadCleaners(1, {
-                      city_id: cityId,
-                      district_id: value,
-                    });
-                  }}
-                  options={districtOptions}
-                  placeholder={
-                    districtLoading ? "İlçeler yükleniyor..." : "Tüm İlçeler"
-                  }
-                  searchPlaceholder="İlçe ara..."
-                  disabled={!cityId || districtLoading}
-                />
-              </div>
-
-              <div className="grid gap-2 lg:min-w-44">
-                <span className="hidden px-1 text-xs font-black uppercase tracking-[0.14em] text-transparent lg:block">
-                  Ara
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() => loadCleaners(1)}
-                  disabled={listLoading}
-                  className="min-h-12 w-full cursor-pointer rounded-2xl bg-[#06264a] px-5 text-sm font-black text-white shadow-lg shadow-blue-950/10 transition hover:-translate-y-0.5 hover:bg-[#0b355f] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Temizlikçi Getir
-                </button>
-              </div>
-
-              <div className="grid gap-2 lg:min-w-44">
-                <span className="hidden px-1 text-xs font-black uppercase tracking-[0.14em] text-transparent lg:block">
-                  Temizle
-                </span>
-
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  disabled={listLoading}
-                  className="min-h-12 w-full cursor-pointer rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-[#06264a] transition hover:-translate-y-0.5 hover:border-[#f6a313] hover:text-[#f6a313] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Filtreyi Temizle
-                </button>
-              </div>
-            </div>
-
-            {(cityId || districtId) && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {cityId && (
-                  <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-[#b86b00] ring-1 ring-orange-100">
-                    İl:{" "}
-                    {cities.find((city) => String(city.id) === String(cityId))
-                      ?.name || cityId}
-                  </span>
-                )}
-
-                {districtId && (
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-[#06264a] ring-1 ring-blue-100">
-                    İlçe:{" "}
-                    {districts.find(
-                      (district) => String(district.id) === String(districtId)
-                    )?.name || districtId}
-                  </span>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="relative mt-5 min-h-[260px]">

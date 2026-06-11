@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { getAuthUser, type AuthUser } from "@/lib/auth";
+import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
+import { getAuthUser, saveAuth, type AuthResponse } from "@/lib/auth";
 import { services } from "@/lib/site";
 import {
   getCities,
@@ -10,297 +12,231 @@ import {
   type City,
   type District,
 } from "@/lib/locations";
-import {
-  getCleaners,
-  type Cleaner,
-  type CleanerPaginationMeta,
-} from "@/lib/cleaners";
-import PageLoader from "@/components/ui/PageLoader";
-import SearchableSelect from "@/components/ui/SearchableSelect";
 
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((item) => item[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function LockedContactBox() {
-  return (
-    <div className="relative overflow-hidden rounded-[1.4rem] bg-[#06264a] p-5 text-white">
-      <div className="pointer-events-none select-none blur-[4px]">
-        <div className="text-xs font-black uppercase tracking-[0.18em] text-orange-200">
-          İletişim Bilgileri
-        </div>
-
-        <div className="mt-4 text-lg font-black">05xx xxx xx xx</div>
-
-        <div className="mt-4 grid gap-2">
-          <div className="flex min-h-11 items-center justify-center rounded-full bg-[#f6a313] px-4 text-sm font-black text-white">
-            Ara
-          </div>
-
-          <div className="flex min-h-11 items-center justify-center rounded-full bg-white px-4 text-sm font-black text-[#06264a]">
-            WhatsApp ile Yaz
-          </div>
-        </div>
-      </div>
-
-      <div className="absolute inset-0 flex items-center justify-center bg-[#06264a]/55 backdrop-blur-[1px]">
-        <div className="mx-3 rounded-[1.2rem] bg-white p-4 text-center shadow-2xl">
-          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#06264a] text-white">
-            🔒
-          </div>
-
-          <div className="mt-3 text-sm font-black text-[#06264a]">
-            İletişim kilitli
-          </div>
-
-          <p className="mt-2 text-xs leading-5 text-slate-600">
-            Telefon ve WhatsApp bilgilerini görmek için müşteri hesabıyla giriş
-            yapın.
-          </p>
-
-          <div className="mt-3 grid gap-2">
-            <Link
-              href="/giris"
-              className="rounded-full bg-[#f6a313] px-4 py-2 text-xs font-black text-white"
-            >
-              Giriş Yap
-            </Link>
-
-            <Link
-              href="/kullanici-kayit"
-              className="rounded-full bg-[#06264a] px-4 py-2 text-xs font-black text-white"
-            >
-              Üye Ol
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CustomerContactBox({ cleaner }: { cleaner: Cleaner }) {
-  return (
-    <div className="rounded-[1.4rem] bg-[#06264a] p-5 text-white">
-      <div className="text-xs font-black uppercase tracking-[0.18em] text-orange-200">
-        İletişim Bilgileri
-      </div>
-
-      <div className="mt-4 text-lg font-black">
-        {cleaner.phone || "Telefon belirtilmedi"}
-      </div>
-
-      <div className="mt-4 grid gap-2">
-        {cleaner.phone && (
-          <a
-            href={`tel:${cleaner.phone}`}
-            className="flex min-h-11 items-center justify-center rounded-full bg-[#f6a313] px-4 text-sm font-black text-white transition hover:bg-[#e58f00]"
-          >
-            Ara
-          </a>
-        )}
-
-        {cleaner.phone && (
-          <a
-            href={`https://wa.me/9${cleaner.phone.replace(/\D/g, "")}`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex min-h-11 items-center justify-center rounded-full bg-white px-4 text-sm font-black text-[#06264a] transition hover:bg-blue-50"
-          >
-            WhatsApp ile Yaz
-          </a>
-        )}
-
-        {cleaner.email && (
-          <a
-            href={`mailto:${cleaner.email}`}
-            className="flex min-h-11 items-center justify-center rounded-full border border-white/20 px-4 text-sm font-black text-white transition hover:bg-white/10"
-          >
-            E-posta Gönder
-          </a>
-        )}
-      </div>
-    </div>
-  );
-}
-
-const emptyMeta: CleanerPaginationMeta = {
-  current_page: 1,
-  last_page: 1,
-  per_page: 12,
-  total: 0,
-  from: null,
-  to: null,
+type ApiValidationError = {
+  message?: string;
+  errors?: Record<string, string[]>;
 };
 
-export default function FindCleanerPage() {
-  const [user, setUser] = useState<AuthUser | null>(null);
+type ClientValidationErrors = Record<string, string[]>;
 
-  const [cleaners, setCleaners] = useState<Cleaner[]>([]);
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function formatPhoneInput(value: string) {
+  const digits = onlyDigits(value).slice(0, 11);
+
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
+  if (digits.length <= 9) {
+    return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+  }
+
+  return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(
+    7,
+    9
+  )} ${digits.slice(9, 11)}`;
+}
+
+function normalizePhoneForApi(value: string) {
+  return onlyDigits(value).slice(0, 11);
+}
+
+function isValidTurkishMobilePhone(value: string) {
+  const digits = normalizePhoneForApi(value);
+
+  return /^05\d{9}$/.test(digits);
+}
+
+function normalizeName(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function normalizeEmail(value: string) {
+  return value.trim().toLocaleLowerCase("tr-TR");
+}
+
+function normalizeText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function isStrongEnoughPassword(value: string) {
+  return (
+    value.length >= 8 &&
+    /[a-zA-ZÇĞİÖŞÜçğıöşü]/.test(value) &&
+    /\d/.test(value)
+  );
+}
+
+function validateCleanerRegisterForm(values: {
+  name: string;
+  phone: string;
+  email: string;
+  password: string;
+  passwordConfirmation: string;
+  cityId: string;
+  districtId: string;
+  selectedServices: string[];
+  experience: string;
+  dailyPrice: string;
+  description: string;
+  kvkkAccepted: boolean;
+}) {
+  const errors: ClientValidationErrors = {};
+
+  const cleanName = normalizeName(values.name);
+  const cleanEmail = normalizeEmail(values.email);
+  const cleanPhone = normalizePhoneForApi(values.phone);
+  const cleanExperience = normalizeText(values.experience);
+  const cleanDailyPrice = normalizeText(values.dailyPrice);
+  const cleanDescription = normalizeText(values.description);
+
+  if (!cleanName) {
+    errors.name = ["Ad soyad alanı zorunludur."];
+  } else if (cleanName.length < 3) {
+    errors.name = ["Ad soyad en az 3 karakter olmalıdır."];
+  } else if (cleanName.length > 80) {
+    errors.name = ["Ad soyad en fazla 80 karakter olabilir."];
+  }
+
+  if (!cleanPhone) {
+    errors.phone = ["Telefon alanı zorunludur."];
+  } else if (cleanPhone.length !== 11) {
+    errors.phone = [
+      "Telefon numarası 11 haneli olmalıdır. Örnek: 05xx xxx xx xx",
+    ];
+  } else if (!isValidTurkishMobilePhone(cleanPhone)) {
+    errors.phone = [
+      "Telefon numarası 05 ile başlamalıdır. Örnek: 05xx xxx xx xx",
+    ];
+  }
+
+  if (!cleanEmail) {
+    errors.email = ["E-posta alanı zorunludur."];
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    errors.email = ["Geçerli bir e-posta adresi giriniz."];
+  } else if (cleanEmail.length > 120) {
+    errors.email = ["E-posta adresi çok uzun."];
+  }
+
+  if (!values.password) {
+    errors.password = ["Şifre alanı zorunludur."];
+  } else if (!isStrongEnoughPassword(values.password)) {
+    errors.password = [
+      "Şifre en az 8 karakter olmalı ve en az 1 harf ile 1 rakam içermelidir.",
+    ];
+  }
+
+  if (!values.passwordConfirmation) {
+    errors.password_confirmation = ["Şifre tekrarı zorunludur."];
+  } else if (values.password !== values.passwordConfirmation) {
+    errors.password_confirmation = ["Şifreler birbiriyle eşleşmiyor."];
+  }
+
+  if (!values.cityId) {
+    errors.city_id = ["İl seçimi zorunludur."];
+  }
+
+  if (!values.districtId) {
+    errors.district_id = ["İlçe seçimi zorunludur."];
+  }
+
+  if (values.selectedServices.length === 0) {
+    errors.services = ["En az 1 hizmet alanı seçmelisiniz."];
+  }
+
+  if (!cleanExperience) {
+    errors.experience = ["Deneyim alanı zorunludur."];
+  } else if (cleanExperience.length > 100) {
+    errors.experience = ["Deneyim alanı en fazla 100 karakter olabilir."];
+  }
+
+  if (cleanDailyPrice && cleanDailyPrice.length > 100) {
+    errors.daily_price = ["Günlük ücret alanı en fazla 100 karakter olabilir."];
+  }
+
+  if (cleanDescription && cleanDescription.length > 500) {
+    errors.description = ["Açıklama en fazla 500 karakter olabilir."];
+  }
+
+  if (!values.kvkkAccepted) {
+    errors.kvkk_accepted = [
+      "KVKK, Gizlilik Politikası ve Kullanım Şartları kabul edilmelidir.",
+    ];
+  }
+
+  return errors;
+}
+
+export default function CleanerRegisterPage() {
+  const router = useRouter();
+
+  const [authChecked, setAuthChecked] = useState(false);
+
   const [cities, setCities] = useState<City[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
 
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+
   const [cityId, setCityId] = useState("");
   const [districtId, setDistrictId] = useState("");
-  const [serviceType, setServiceType] = useState("");
 
-  const [meta, setMeta] = useState<CleanerPaginationMeta>(emptyMeta);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [experience, setExperience] = useState("");
+  const [dailyPrice, setDailyPrice] = useState("");
+  const [description, setDescription] = useState("");
 
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [listLoading, setListLoading] = useState(false);
+  const [kvkkAccepted, setKvkkAccepted] = useState(false);
+
+  const [loading, setLoading] = useState(false);
   const [cityLoading, setCityLoading] = useState(true);
   const [districtLoading, setDistrictLoading] = useState(false);
 
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
-  const cityOptions = useMemo(
-    () =>
-      cities.map((city) => ({
-        value: String(city.id),
-        label: city.name,
-      })),
-    [cities]
+  const passwordChecks = useMemo(
+    () => ({
+      minLength: password.length >= 8,
+      hasLetter: /[a-zA-ZÇĞİÖŞÜçğıöşü]/.test(password),
+      hasNumber: /\d/.test(password),
+      matches:
+        password.length > 0 &&
+        passwordConfirmation.length > 0 &&
+        password === passwordConfirmation,
+    }),
+    [password, passwordConfirmation]
   );
 
-  const districtOptions = useMemo(
-    () =>
-      districts.map((district) => ({
-        value: String(district.id),
-        label: district.name,
-      })),
-    [districts]
-  );
+  useEffect(() => {
+    const user = getAuthUser();
 
-  const serviceOptions = useMemo(
-    () =>
-      services.map((service: string) => ({
-        value: service,
-        label: service,
-      })),
-    []
-  );
-
-  function updateCleanerUrl(filters: {
-    city_id?: string;
-    district_id?: string;
-    service_type?: string;
-    page?: string;
-  }) {
-    if (typeof window === "undefined") return;
-
-    const params = new URLSearchParams();
-
-    if (filters.city_id) params.set("city_id", filters.city_id);
-    if (filters.district_id) params.set("district_id", filters.district_id);
-    if (filters.service_type) params.set("service_type", filters.service_type);
-    if (filters.page && filters.page !== "1") params.set("page", filters.page);
-
-    const query = params.toString();
-
-    window.history.replaceState(
-      null,
-      "",
-      `/temizlikci-bul${query ? `?${query}` : ""}`
-    );
-  }
-
-  async function loadCleaners(
-    nextPage = 1,
-    customFilters?: {
-      city_id?: string;
-      district_id?: string;
-      service_type?: string;
-    }
-  ) {
-    try {
-      setListLoading(true);
-      setError("");
-
-      const finalFilters = {
-        city_id: (customFilters?.city_id ?? cityId).trim(),
-        district_id: (customFilters?.district_id ?? districtId).trim(),
-        service_type: (customFilters?.service_type ?? serviceType).trim(),
-        page: String(nextPage),
-        per_page: "12",
-      };
-
-      updateCleanerUrl({
-        city_id: finalFilters.city_id,
-        district_id: finalFilters.district_id,
-        service_type: finalFilters.service_type,
-        page: finalFilters.page,
-      });
-
-      const response = await getCleaners(finalFilters);
-
-      setCleaners(response.data);
-      setMeta(response.meta || emptyMeta);
-    } catch (err) {
-      const apiError = err as { message?: string };
-
-      setError(
-        apiError.message ||
-          "Temizlikçiler yüklenemedi. Lütfen tekrar deneyin."
-      );
-      setCleaners([]);
-      setMeta(emptyMeta);
-    } finally {
-      setInitialLoading(false);
-      setListLoading(false);
-    }
-  }
-
-  function clearFilters() {
-    setCityId("");
-    setDistrictId("");
-    setServiceType("");
-    setDistricts([]);
-
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", "/temizlikci-bul");
+    if (!user) {
+      setAuthChecked(true);
+      return;
     }
 
-    loadCleaners(1, {
-      city_id: "",
-      district_id: "",
-      service_type: "",
-    });
-  }
+    if (user.role === "cleaner") {
+      router.replace("/is-talepleri");
+      return;
+    }
+
+    if (user.role === "customer") {
+      router.replace("/temizlikci-bul");
+      return;
+    }
+
+    router.replace("/");
+  }, [router]);
 
   useEffect(() => {
-    setUser(getAuthUser());
-  }, []);
+    if (!authChecked) return;
 
-  useEffect(() => {
-    const params =
-      typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search)
-        : new URLSearchParams();
-
-    const urlCityId = params.get("city_id") || "";
-    const urlDistrictId = params.get("district_id") || "";
-    const urlServiceType = params.get("service_type") || "";
-    const urlPage = params.get("page") || "1";
-
-    setCityId(urlCityId);
-    setDistrictId(urlDistrictId);
-    setServiceType(urlServiceType);
-
-    loadCleaners(Number(urlPage), {
-      city_id: urlCityId,
-      district_id: urlDistrictId,
-      service_type: urlServiceType,
-    });
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
     async function loadCities() {
       try {
         setCityLoading(true);
@@ -309,14 +245,14 @@ export default function FindCleanerPage() {
 
         setCities(response.data);
       } catch {
-        setError("İl listesi yüklenemedi.");
+        setError("İl listesi yüklenemedi. Lütfen daha sonra tekrar deneyin.");
       } finally {
         setCityLoading(false);
       }
     }
 
     loadCities();
-  }, []);
+  }, [authChecked]);
 
   useEffect(() => {
     async function loadDistricts() {
@@ -328,351 +264,682 @@ export default function FindCleanerPage() {
 
       try {
         setDistrictLoading(true);
-
-        const currentDistrictId = districtId;
+        setDistrictId("");
 
         const response = await getDistricts(cityId);
 
         setDistricts(response.data);
-
-        if (!currentDistrictId) {
-          return;
-        }
-
-        const districtExists = response.data.some(
-          (district) => String(district.id) === String(currentDistrictId)
-        );
-
-        if (!districtExists) {
-          setDistrictId("");
-        }
       } catch {
-        setError("İlçe listesi yüklenemedi.");
+        setError("İlçe listesi yüklenemedi. Lütfen tekrar deneyin.");
       } finally {
         setDistrictLoading(false);
       }
     }
 
     loadDistricts();
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityId]);
 
-  const canSeeContact = user?.role === "customer";
+  function getFieldError(field: string) {
+    return fieldErrors[field]?.[0];
+  }
+
+  function clearFieldError(field: string) {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function toggleService(service: string) {
+    setSelectedServices((current) => {
+      if (current.includes(service)) {
+        return current.filter((item) => item !== service);
+      }
+
+      return [...current, service];
+    });
+
+    clearFieldError("services");
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (loading) return;
+
+    setError("");
+    setFieldErrors({});
+
+    const clientErrors = validateCleanerRegisterForm({
+      name,
+      phone,
+      email,
+      password,
+      passwordConfirmation,
+      cityId,
+      districtId,
+      selectedServices,
+      experience,
+      dailyPrice,
+      description,
+      kvkkAccepted,
+    });
+
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      setError("Lütfen formdaki eksik veya hatalı alanları düzeltin.");
+      return;
+    }
+
+    setLoading(true);
+
+    const cleanName = normalizeName(name);
+    const cleanEmail = normalizeEmail(email);
+    const cleanPhone = normalizePhoneForApi(phone);
+    const cleanExperience = normalizeText(experience);
+    const cleanDailyPrice = normalizeText(dailyPrice);
+    const cleanDescription = normalizeText(description);
+
+    try {
+      const response = await apiFetch<AuthResponse>("/auth/register/cleaner", {
+        method: "POST",
+        body: JSON.stringify({
+          name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          city_id: Number(cityId),
+          district_id: Number(districtId),
+          password,
+          password_confirmation: passwordConfirmation,
+          kvkk_accepted: kvkkAccepted,
+
+          services: selectedServices,
+          experience: cleanExperience,
+          daily_price: cleanDailyPrice || null,
+          description: cleanDescription || null,
+        }),
+      });
+
+      saveAuth(response.token, response.user);
+
+      router.replace("/is-talepleri");
+      router.refresh();
+    } catch (err) {
+      const apiError = err as ApiValidationError;
+
+      setError(apiError.message || "Kayıt işlemi başarısız oldu.");
+      setFieldErrors(apiError.errors || {});
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!authChecked) {
+    return null;
+  }
 
   return (
     <main className="page-bottom-space py-8 md:py-14">
       <div className="container-main">
         <div className="mx-auto max-w-6xl">
-          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-            <div>
-              <Link href="/" className="text-sm font-black text-[#06264a]">
-                ← Ana sayfaya dön
-              </Link>
+          <Link href="/kayit" className="text-sm font-black text-[#06264a]">
+            ← Üyelik seçimine dön
+          </Link>
 
-              <p className="mt-7 text-xs font-black uppercase tracking-[0.22em] text-[#f6a313]">
-                Temizlikçi Bul
-              </p>
+          <div className="mt-7 grid gap-8 lg:grid-cols-[0.78fr_1.22fr]">
+            <aside className="relative overflow-hidden rounded-[2rem] bg-[#06264a] p-7 text-white md:p-9">
+              <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#f6a313]/20 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-blue-400/10 blur-3xl" />
 
-              <h1 className="mt-3 text-4xl font-black tracking-[-0.06em] text-[#06264a] md:text-5xl">
-                Size en uygun temizlikçiyi bulun
-              </h1>
-
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
-                Kayıtlı temizlikçileri il, ilçe ve hizmet türüne göre
-                filtreleyin. İletişim bilgilerini görmek için müşteri hesabıyla
-                giriş yapabilirsiniz.
-              </p>
-            </div>
-
-            {user?.role === "customer" && (
-              <Link
-                href="/talep-olustur"
-                className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#f6a313] px-6 text-sm font-black text-white shadow-lg shadow-orange-400/25 transition hover:-translate-y-0.5 hover:bg-[#e58f00]"
-              >
-                Talep Oluştur
-              </Link>
-            )}
-          </div>
-
-          <div className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)] md:p-5">
-            <div className="grid gap-3 md:grid-cols-5">
-              <SearchableSelect
-                value={cityId}
-                onChange={(value) => {
-                  setCityId(value);
-                  setDistrictId("");
-                }}
-                options={cityOptions}
-                placeholder={cityLoading ? "İller yükleniyor..." : "Tüm İller"}
-                searchPlaceholder="İl ara..."
-                disabled={cityLoading}
-              />
-
-              <SearchableSelect
-                value={districtId}
-                onChange={setDistrictId}
-                options={districtOptions}
-                placeholder={
-                  districtLoading ? "İlçeler yükleniyor..." : "Tüm İlçeler"
-                }
-                searchPlaceholder="İlçe ara..."
-                disabled={!cityId || districtLoading}
-              />
-
-              <SearchableSelect
-                value={serviceType}
-                onChange={setServiceType}
-                options={serviceOptions}
-                placeholder="Tüm Hizmetler"
-                searchPlaceholder="Hizmet ara..."
-              />
-
-              <button
-                type="button"
-                onClick={() => loadCleaners(1)}
-                disabled={listLoading}
-                className="min-h-12 cursor-pointer rounded-2xl bg-[#06264a] px-5 text-sm font-black text-white transition hover:bg-[#0b355f] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Temizlikçi Getir
-              </button>
-
-              <button
-                type="button"
-                onClick={clearFilters}
-                disabled={listLoading}
-                className="min-h-12 cursor-pointer rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-[#06264a] transition hover:border-[#f6a313] hover:text-[#f6a313] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Filtreyi Temizle
-              </button>
-            </div>
-          </div>
-
-          <div className="relative mt-5 min-h-[260px]">
-            {listLoading && !initialLoading && (
-              <PageLoader text="Liste güncelleniyor..." />
-            )}
-
-            <div
-              className={`transition duration-300 ${
-                listLoading && !initialLoading
-                  ? "scale-[0.995] opacity-40 blur-[1px]"
-                  : "scale-100 opacity-100 blur-0"
-              }`}
-            >
-              {initialLoading && (
-                <div className="grid gap-4">
-                  {[1, 2, 3].map((item) => (
-                    <div
-                      key={item}
-                      className="animate-pulse rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)] md:p-6"
-                    >
-                      <div className="h-5 w-2/5 rounded-full bg-slate-200" />
-                      <div className="mt-4 h-4 w-3/5 rounded-full bg-slate-200" />
-                      <div className="mt-3 h-4 w-1/2 rounded-full bg-slate-200" />
-                    </div>
-                  ))}
+              <div className="relative">
+                <div className="inline-flex rounded-[1.2rem] bg-white px-4 py-3 shadow-xl shadow-blue-950/20">
+                  <img
+                    src="/brand/logo-primary.png"
+                    alt="BenimElemanım"
+                    className="h-11 w-auto max-w-[220px] object-contain"
+                  />
                 </div>
-              )}
 
-              {!initialLoading && error && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">
+                <p className="mt-7 text-xs font-black uppercase tracking-[0.22em] text-orange-200">
+                  Temizlikçi Üyeliği
+                </p>
+
+                <h1 className="mt-4 text-4xl font-black leading-tight tracking-[-0.05em]">
+                  Bölgenizdeki iş taleplerine ulaşın.
+                </h1>
+
+                <p className="mt-5 text-sm leading-8 text-blue-100">
+                  Ücretsiz temizlikçi hesabı oluşturarak iş taleplerini
+                  görüntüleyebilir, müşterilerle kolayca iletişime
+                  geçebilirsiniz.
+                </p>
+
+                <div className="mt-7 grid gap-3">
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                    <div className="font-black">İş taleplerini görün</div>
+                    <p className="mt-2 text-sm leading-6 text-blue-100">
+                      Bölgenizde yayınlanan temizlik taleplerine hızlıca
+                      ulaşabilirsiniz.
+                    </p>
+                  </div>
+
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                    <div className="font-black">Profilinizi oluşturun</div>
+                    <p className="mt-2 text-sm leading-6 text-blue-100">
+                      Hizmet alanlarınızı, deneyiminizi ve açıklamanızı
+                      ekleyerek görünür olun.
+                    </p>
+                  </div>
+
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                    <div className="font-black">Güvenli kayıt</div>
+                    <p className="mt-2 text-sm leading-6 text-blue-100">
+                      Telefon, e-posta, şifre ve KVKK onayı kontrol edilerek
+                      kayıt alınır.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <form
+              onSubmit={handleSubmit}
+              noValidate
+              className="soft-card rounded-[2.2rem] p-5 md:p-8"
+            >
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#f6a313]">
+                Ücretsiz Temizlikçi Kaydı
+              </p>
+
+              <h2 className="mt-3 text-3xl font-black tracking-[-0.05em] text-[#06264a]">
+                Temizlikçi hesabınızı oluşturun
+              </h2>
+
+              <p className="mt-3 text-sm leading-7 text-slate-600">
+                Bu hesapla iş taleplerini görüntüleyebilir ve temizlikçi
+                profilinizi oluşturabilirsiniz.
+              </p>
+
+              {error && (
+                <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold leading-6 text-red-700">
                   {error}
                 </div>
               )}
 
-              {!initialLoading && !error && cleaners.length === 0 && (
-                <div className="rounded-[1.8rem] bg-white p-8 text-center shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-orange-50 text-2xl">
-                    🧹
-                  </div>
+              <div className="mt-7 grid gap-4 md:grid-cols-2">
+                <label>
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    Ad Soyad
+                  </span>
 
-                  <h2 className="mt-5 text-2xl font-black tracking-[-0.04em] text-[#06264a]">
-                    Uygun temizlikçi bulunamadı
-                  </h2>
+                  <input
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value.replace(/\s{2,}/g, " "));
+                      clearFieldError("name");
+                    }}
+                    onBlur={() => setName((current) => normalizeName(current))}
+                    maxLength={80}
+                    autoComplete="name"
+                    placeholder="Adınız soyadınız"
+                    className={`min-h-14 w-full rounded-2xl border bg-slate-50 px-4 text-sm font-bold outline-none transition focus:bg-white ${
+                      getFieldError("name")
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-slate-200 focus:border-[#f6a313]"
+                    }`}
+                  />
 
-                  <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-slate-600">
-                    Filtreleri değiştirebilir veya talep oluşturarak
-                    temizlikçilerin size ulaşmasını sağlayabilirsiniz.
+                  {getFieldError("name") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("name")}
+                    </p>
+                  )}
+                </label>
+
+                <label>
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    Telefon
+                  </span>
+
+                  <input
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(formatPhoneInput(e.target.value));
+                      clearFieldError("phone");
+                    }}
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    maxLength={14}
+                    placeholder="05xx xxx xx xx"
+                    className={`min-h-14 w-full rounded-2xl border bg-slate-50 px-4 text-sm font-bold outline-none transition focus:bg-white ${
+                      getFieldError("phone")
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-slate-200 focus:border-[#f6a313]"
+                    }`}
+                  />
+
+                  <p className="mt-2 text-xs font-bold text-slate-400">
+                    Sadece Türkiye GSM formatı: 05xx xxx xx xx
                   </p>
 
-                  {user?.role === "customer" && (
-                    <Link
-                      href="/talep-olustur"
-                      className="mt-6 inline-flex min-h-12 items-center justify-center rounded-full bg-[#f6a313] px-6 text-sm font-black text-white"
+                  {getFieldError("phone") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("phone")}
+                    </p>
+                  )}
+                </label>
+
+                <label>
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    E-posta
+                  </span>
+
+                  <input
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      clearFieldError("email");
+                    }}
+                    onBlur={() => setEmail((current) => normalizeEmail(current))}
+                    type="email"
+                    maxLength={120}
+                    autoComplete="email"
+                    placeholder="ornek@mail.com"
+                    className={`min-h-14 w-full rounded-2xl border bg-slate-50 px-4 text-sm font-bold outline-none transition focus:bg-white ${
+                      getFieldError("email")
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-slate-200 focus:border-[#f6a313]"
+                    }`}
+                  />
+
+                  {getFieldError("email") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("email")}
+                    </p>
+                  )}
+                </label>
+
+                <label>
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    Deneyim
+                  </span>
+
+                  <input
+                    value={experience}
+                    onChange={(e) => {
+                      setExperience(e.target.value.slice(0, 100));
+                      clearFieldError("experience");
+                    }}
+                    onBlur={() =>
+                      setExperience((current) => normalizeText(current))
+                    }
+                    maxLength={100}
+                    placeholder="Örn: 3 yıl ev temizliği deneyimi"
+                    className={`min-h-14 w-full rounded-2xl border bg-slate-50 px-4 text-sm font-bold outline-none transition focus:bg-white ${
+                      getFieldError("experience")
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-slate-200 focus:border-[#f6a313]"
+                    }`}
+                  />
+
+                  {getFieldError("experience") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("experience")}
+                    </p>
+                  )}
+                </label>
+
+                <label>
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    Şifre
+                  </span>
+
+                  <input
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value.slice(0, 72));
+                      clearFieldError("password");
+                    }}
+                    type="password"
+                    autoComplete="new-password"
+                    maxLength={72}
+                    placeholder="Şifre oluşturun"
+                    className={`min-h-14 w-full rounded-2xl border bg-slate-50 px-4 text-sm font-bold outline-none transition focus:bg-white ${
+                      getFieldError("password")
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-slate-200 focus:border-[#f6a313]"
+                    }`}
+                  />
+
+                  <div className="mt-2 grid gap-1 text-xs font-bold">
+                    <span
+                      className={
+                        passwordChecks.minLength
+                          ? "text-emerald-600"
+                          : "text-slate-400"
+                      }
                     >
-                      Talep Oluştur
-                    </Link>
+                      {passwordChecks.minLength ? "✓" : "•"} En az 8 karakter
+                    </span>
+                    <span
+                      className={
+                        passwordChecks.hasLetter
+                          ? "text-emerald-600"
+                          : "text-slate-400"
+                      }
+                    >
+                      {passwordChecks.hasLetter ? "✓" : "•"} En az 1 harf
+                    </span>
+                    <span
+                      className={
+                        passwordChecks.hasNumber
+                          ? "text-emerald-600"
+                          : "text-slate-400"
+                      }
+                    >
+                      {passwordChecks.hasNumber ? "✓" : "•"} En az 1 rakam
+                    </span>
+                  </div>
+
+                  {getFieldError("password") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("password")}
+                    </p>
+                  )}
+                </label>
+
+                <label>
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    Şifre Tekrarı
+                  </span>
+
+                  <input
+                    value={passwordConfirmation}
+                    onChange={(e) => {
+                      setPasswordConfirmation(e.target.value.slice(0, 72));
+                      clearFieldError("password_confirmation");
+                    }}
+                    type="password"
+                    autoComplete="new-password"
+                    maxLength={72}
+                    placeholder="Şifrenizi tekrar girin"
+                    className={`min-h-14 w-full rounded-2xl border bg-slate-50 px-4 text-sm font-bold outline-none transition focus:bg-white ${
+                      getFieldError("password_confirmation")
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-slate-200 focus:border-[#f6a313]"
+                    }`}
+                  />
+
+                  {passwordConfirmation && (
+                    <p
+                      className={`mt-2 text-xs font-bold ${
+                        passwordChecks.matches
+                          ? "text-emerald-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {passwordChecks.matches
+                        ? "✓ Şifreler eşleşiyor"
+                        : "Şifreler eşleşmiyor"}
+                    </p>
+                  )}
+
+                  {getFieldError("password_confirmation") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("password_confirmation")}
+                    </p>
+                  )}
+                </label>
+
+                <label>
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    İl
+                  </span>
+
+                  <select
+                    value={cityId}
+                    onChange={(e) => {
+                      setCityId(e.target.value);
+                      clearFieldError("city_id");
+                      clearFieldError("district_id");
+                    }}
+                    disabled={cityLoading}
+                    className={`min-h-14 w-full rounded-2xl border bg-slate-50 px-4 text-sm font-bold outline-none transition focus:bg-white ${
+                      getFieldError("city_id")
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-slate-200 focus:border-[#f6a313]"
+                    }`}
+                  >
+                    <option value="">
+                      {cityLoading ? "İller yükleniyor..." : "İl seçiniz"}
+                    </option>
+                    {cities.map((city) => (
+                      <option key={city.id} value={city.id}>
+                        {city.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {getFieldError("city_id") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("city_id")}
+                    </p>
+                  )}
+                </label>
+
+                <label>
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    İlçe
+                  </span>
+
+                  <select
+                    value={districtId}
+                    onChange={(e) => {
+                      setDistrictId(e.target.value);
+                      clearFieldError("district_id");
+                    }}
+                    disabled={!cityId || districtLoading}
+                    className={`min-h-14 w-full rounded-2xl border bg-slate-50 px-4 text-sm font-bold outline-none transition focus:bg-white ${
+                      getFieldError("district_id")
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-slate-200 focus:border-[#f6a313]"
+                    }`}
+                  >
+                    <option value="">
+                      {districtLoading
+                        ? "İlçeler yükleniyor..."
+                        : "İlçe seçiniz"}
+                    </option>
+                    {districts.map((district) => (
+                      <option key={district.id} value={district.id}>
+                        {district.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {getFieldError("district_id") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("district_id")}
+                    </p>
+                  )}
+                </label>
+
+                <label className="md:col-span-2">
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    Günlük Ücret / Beklenti
+                  </span>
+
+                  <input
+                    value={dailyPrice}
+                    onChange={(e) => {
+                      setDailyPrice(e.target.value.slice(0, 100));
+                      clearFieldError("daily_price");
+                    }}
+                    onBlur={() =>
+                      setDailyPrice((current) => normalizeText(current))
+                    }
+                    maxLength={100}
+                    placeholder="Örn: Günlük 1.000 TL veya görüşülür"
+                    className={`min-h-14 w-full rounded-2xl border bg-slate-50 px-4 text-sm font-bold outline-none transition focus:bg-white ${
+                      getFieldError("daily_price")
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-slate-200 focus:border-[#f6a313]"
+                    }`}
+                  />
+
+                  {getFieldError("daily_price") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("daily_price")}
+                    </p>
+                  )}
+                </label>
+
+                <div className="md:col-span-2">
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    Hizmet Alanları
+                  </span>
+
+                  <div
+                    className={`grid gap-2 rounded-2xl border bg-slate-50 p-3 ${
+                      getFieldError("services")
+                        ? "border-red-300"
+                        : "border-slate-200"
+                    } sm:grid-cols-2`}
+                  >
+                    {services.map((service: string) => {
+                      const checked = selectedServices.includes(service);
+
+                      return (
+                        <button
+                          key={service}
+                          type="button"
+                          onClick={() => toggleService(service)}
+                          className={`min-h-11 rounded-xl px-3 text-left text-sm font-black transition ${
+                            checked
+                              ? "bg-[#06264a] text-white shadow-lg shadow-blue-950/10"
+                              : "bg-white text-slate-600 hover:bg-orange-50 hover:text-[#b86b00]"
+                          }`}
+                        >
+                          {checked ? "✓ " : "+ "}
+                          {service}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {getFieldError("services") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("services")}
+                    </p>
                   )}
                 </div>
+
+                <label className="md:col-span-2">
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    Kısa Açıklama
+                  </span>
+
+                  <textarea
+                    value={description}
+                    onChange={(e) => {
+                      setDescription(e.target.value.slice(0, 500));
+                      clearFieldError("description");
+                    }}
+                    onBlur={() =>
+                      setDescription((current) => normalizeText(current))
+                    }
+                    maxLength={500}
+                    rows={4}
+                    placeholder="Kendinizi, çalışabileceğiniz günleri ve hizmet deneyiminizi kısaca yazın."
+                    className={`w-full resize-none rounded-2xl border bg-slate-50 px-4 py-4 text-sm font-bold outline-none transition focus:bg-white ${
+                      getFieldError("description")
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-slate-200 focus:border-[#f6a313]"
+                    }`}
+                  />
+
+                  <div className="mt-2 flex justify-between text-xs font-bold text-slate-400">
+                    <span>En fazla 500 karakter</span>
+                    <span>{description.length}/500</span>
+                  </div>
+
+                  {getFieldError("description") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("description")}
+                    </p>
+                  )}
+                </label>
+              </div>
+
+              <label
+                className={`mt-5 flex gap-3 rounded-2xl border p-4 text-sm leading-6 ${
+                  getFieldError("kvkk_accepted")
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-slate-100 bg-slate-50 text-slate-600"
+                }`}
+              >
+                <input
+                  checked={kvkkAccepted}
+                  onChange={(e) => {
+                    setKvkkAccepted(e.target.checked);
+                    clearFieldError("kvkk_accepted");
+                  }}
+                  type="checkbox"
+                  className="mt-1"
+                />
+
+                <span>
+                  <Link href="/kvkk" className="font-black text-[#06264a]">
+                    KVKK Aydınlatma Metni
+                  </Link>
+                  ,{" "}
+                  <Link
+                    href="/gizlilik-politikasi"
+                    className="font-black text-[#06264a]"
+                  >
+                    Gizlilik Politikası
+                  </Link>{" "}
+                  ve{" "}
+                  <Link
+                    href="/kullanim-sartlari"
+                    className="font-black text-[#06264a]"
+                  >
+                    Kullanım Şartları
+                  </Link>
+                  ’nı okudum, kabul ediyorum.
+                </span>
+              </label>
+
+              {getFieldError("kvkk_accepted") && (
+                <p className="mt-2 text-xs font-bold text-red-600">
+                  {getFieldError("kvkk_accepted")}
+                </p>
               )}
 
-              {!initialLoading && !error && cleaners.length > 0 && (
-                <>
-                  <div className="mb-4 rounded-[1.4rem] border border-slate-200 bg-white px-5 py-4 text-sm font-bold text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.05)]">
-                    Toplam{" "}
-                    <span className="font-black text-[#06264a]">
-                      {meta.total}
-                    </span>{" "}
-                    temizlikçi bulundu.
-                    {meta.from && meta.to && (
-                      <>
-                        {" "}
-                        Şu an{" "}
-                        <span className="font-black text-[#06264a]">
-                          {meta.from}
-                        </span>
-                        -
-                        <span className="font-black text-[#06264a]">
-                          {meta.to}
-                        </span>{" "}
-                        arası gösteriliyor.
-                      </>
-                    )}
-                  </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-6 min-h-14 w-full cursor-pointer rounded-full bg-[#f6a313] px-6 font-black text-white shadow-lg shadow-orange-400/25 transition hover:bg-[#e58f00] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading
+                  ? "Kayıt oluşturuluyor..."
+                  : "Temizlikçi Olarak Üye Ol"}
+              </button>
 
-                  <div className="grid gap-4">
-                    {cleaners.map((cleaner) => (
-                      <article
-                        key={cleaner.id}
-                        className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-200/70 md:p-6"
-                      >
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-[#06264a] text-xl font-black text-white">
-                                {getInitials(cleaner.name)}
-                              </div>
-
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <h2 className="text-2xl font-black tracking-[-0.04em] text-[#06264a]">
-                                    {cleaner.name}
-                                  </h2>
-
-                                  {cleaner.cleaner_profile?.is_verified && (
-                                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">
-                                      Onaylı
-                                    </span>
-                                  )}
-                                </div>
-
-                                <p className="mt-2 text-sm font-black text-[#f6a313]">
-                                  {cleaner.city?.name || "-"}
-                                  {cleaner.district?.name
-                                    ? ` / ${cleaner.district.name}`
-                                    : ""}
-                                </p>
-
-                                {cleaner.cleaner_profile?.description && (
-                                  <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
-                                    {cleaner.cleaner_profile.description}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="mt-5 grid gap-3 text-sm md:grid-cols-3">
-                              <div className="rounded-2xl bg-slate-50 p-4">
-                                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                                  Deneyim
-                                </div>
-                                <div className="mt-2 font-black text-[#06264a]">
-                                  {cleaner.cleaner_profile?.experience ||
-                                    "Belirtilmedi"}
-                                </div>
-                              </div>
-
-                              <div className="rounded-2xl bg-slate-50 p-4">
-                                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                                  Günlük Ücret
-                                </div>
-                                <div className="mt-2 font-black text-[#06264a]">
-                                  {cleaner.cleaner_profile?.daily_price ||
-                                    "Belirtilmedi"}
-                                </div>
-                              </div>
-
-                              <div className="rounded-2xl bg-slate-50 p-4">
-                                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                                  Hizmet Sayısı
-                                </div>
-                                <div className="mt-2 font-black text-[#06264a]">
-                                  {cleaner.cleaner_profile?.services?.length ||
-                                    0}
-                                </div>
-                              </div>
-                            </div>
-
-                            {(cleaner.cleaner_profile?.services ?? []).length >
-                              0 && (
-                              <div className="mt-5 flex flex-wrap gap-2">
-                                {(cleaner.cleaner_profile?.services ?? []).map(
-                                  (service: string) => (
-                                    <span
-                                      key={service}
-                                      className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-[#b86b00] ring-1 ring-orange-100"
-                                    >
-                                      {service}
-                                    </span>
-                                  )
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="shrink-0 lg:w-80">
-                            {canSeeContact ? (
-                              <CustomerContactBox cleaner={cleaner} />
-                            ) : (
-                              <LockedContactBox />
-                            )}
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-
-                  <div className="mt-6 flex flex-col items-center justify-between gap-4 rounded-[1.5rem] border border-slate-200 bg-white p-4 text-sm font-bold text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.05)] md:flex-row">
-                    <div>
-                      Sayfa{" "}
-                      <span className="font-black text-[#06264a]">
-                        {meta.current_page}
-                      </span>{" "}
-                      /{" "}
-                      <span className="font-black text-[#06264a]">
-                        {meta.last_page}
-                      </span>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={meta.current_page <= 1 || listLoading}
-                        onClick={() => loadCleaners(meta.current_page - 1)}
-                        className="min-h-11 cursor-pointer rounded-full border border-slate-200 bg-white px-5 text-sm font-black text-[#06264a] transition hover:border-[#f6a313] hover:text-[#f6a313] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Önceki
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={
-                          meta.current_page >= meta.last_page || listLoading
-                        }
-                        onClick={() => loadCleaners(meta.current_page + 1)}
-                        className="min-h-11 cursor-pointer rounded-full bg-[#06264a] px-5 text-sm font-black text-white transition hover:bg-[#0b355f] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Sonraki
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+              <div className="mt-6 text-center text-sm font-bold text-slate-600">
+                Zaten hesabınız var mı?{" "}
+                <Link href="/giris" className="font-black text-[#06264a]">
+                  Giriş yapın
+                </Link>
+              </div>
+            </form>
           </div>
         </div>
       </div>
     </main>
   );
 }
+
