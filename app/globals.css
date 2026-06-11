@@ -122,3 +122,84 @@ textarea,
 button {
   max-width: 100%;
 }
+.page-transition {
+  animation: pageFadeIn 0.45s ease both;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.soft-card,
+.clean-card {
+  transition:
+    transform 0.35s ease,
+    box-shadow 0.35s ease,
+    border-color 0.35s ease,
+    background-color 0.35s ease;
+}
+
+a,
+button {
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease,
+    color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    opacity 0.25s ease;
+}
+
+input,
+select,
+textarea {
+  transition:
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  box-shadow: 0 0 0 4px rgba(246, 163, 19, 0.16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition,
+  .soft-card,
+  .clean-card,
+  a,
+  button,
+  input,
+  select,
+  textarea {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+.animate-mobile-menu {
+  animation: mobileMenuOpen 0.28s ease both;
+}
+
+@keyframes mobileMenuOpen {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

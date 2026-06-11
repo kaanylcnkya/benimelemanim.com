@@ -132,8 +132,8 @@ export default function Navbar() {
 
           {/* MOBILE MENU */}
           {open && (
-            <div className="mt-4 rounded-[1.6rem] border border-slate-200 bg-white p-3 shadow-2xl xl:hidden">
-              <div className="grid gap-2">
+  <div className="animate-mobile-menu mt-4 rounded-[1.6rem] border border-slate-200 bg-white p-3 shadow-2xl xl:hidden">
+                  <div className="grid gap-2">
                 <Link
                   href="/temizlikci-bul"
                   onClick={() => setOpen(false)}
