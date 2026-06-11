@@ -26,7 +26,7 @@ export default function RegisterChoicePage() {
 
           <div className="mt-10 grid gap-5 md:grid-cols-2">
             <Link
-              href="/kayit?type=customer"
+              href="/kullanici-kayit"
               className="group soft-card rounded-[2rem] p-6 transition hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-950/10 md:p-8"
             >
               <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-orange-100 text-3xl">

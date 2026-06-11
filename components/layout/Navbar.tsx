@@ -5,7 +5,6 @@ import { useState } from "react";
 
 const navItems = [
   { label: "Hizmetler", href: "/#hizmetler" },
-  { label: "Nasıl Çalışır?", href: "/#nasil-calisir" },
   { label: "Temizlikçi Ol", href: "/temizlikci-ol" },
 ];
 
@@ -56,26 +55,7 @@ export default function Navbar() {
 
             {/* DESKTOP ACTIONS */}
             <div className="hidden shrink-0 items-center gap-2 md:flex">
-            
-
               <Link
-                href="/is-talepleri"
-                className="hidden whitespace-nowrap rounded-full border border-slate-200 bg-white px-5 py-3 text-[13px] font-black text-[#06264a] transition hover:-translate-y-0.5 hover:border-[#f6a313] hover:text-[#f6a313] lg:inline-flex"
-              >
-                İş Taleplerini Gör
-              </Link>
-
-              <Link
-                href="/temizlikci-bul"
-                className="group inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-[#f6a313] px-5 py-3 text-[13px] font-black text-white shadow-lg shadow-orange-400/25 transition hover:-translate-y-0.5 hover:bg-[#e58f00]"
-              >
-                Temizlikçi Bul
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 transition group-hover:translate-x-0.5">
-                  →
-                </span>
-              </Link>
-            </div>
-  <Link
                 href="/giris"
                 className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-[#06264a] transition hover:border-[#f6a313] hover:text-[#f6a313]"
                 aria-label="Giriş yap"
@@ -94,6 +74,32 @@ export default function Navbar() {
                   />
                 </svg>
               </Link>
+
+              <Link
+                href="/kayit"
+                className="hidden whitespace-nowrap rounded-full border border-slate-200 bg-white px-5 py-3 text-[13px] font-black text-[#06264a] transition hover:-translate-y-0.5 hover:border-[#f6a313] hover:text-[#f6a313] lg:inline-flex"
+              >
+                Üye Ol
+              </Link>
+
+              <Link
+                href="/is-talepleri"
+                className="hidden whitespace-nowrap rounded-full border border-slate-200 bg-white px-5 py-3 text-[13px] font-black text-[#06264a] transition hover:-translate-y-0.5 hover:border-[#f6a313] hover:text-[#f6a313] lg:inline-flex"
+              >
+                İş Talepleri
+              </Link>
+
+              <Link
+                href="/temizlikci-bul"
+                className="group inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-[#f6a313] px-5 py-3 text-[13px] font-black text-white shadow-lg shadow-orange-400/25 transition hover:-translate-y-0.5 hover:bg-[#e58f00]"
+              >
+                Temizlikçi Bul
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 transition group-hover:translate-x-0.5">
+                  →
+                </span>
+              </Link>
+            </div>
+
             {/* MOBILE MENU BUTTON */}
             <button
               type="button"
@@ -156,13 +162,21 @@ export default function Navbar() {
                 ))}
               </div>
 
-              <div className="mt-3">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <Link
                   href="/giris"
                   onClick={() => setOpen(false)}
-                  className="block rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-black text-[#06264a]"
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-black text-[#06264a]"
                 >
                   Giriş Yap
+                </Link>
+
+                <Link
+                  href="/kayit"
+                  onClick={() => setOpen(false)}
+                  className="rounded-2xl bg-slate-50 px-4 py-3 text-center text-sm font-black text-[#06264a]"
+                >
+                  Üye Ol
                 </Link>
               </div>
             </div>
