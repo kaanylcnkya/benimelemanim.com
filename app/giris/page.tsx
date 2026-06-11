@@ -1,6 +1,66 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
+import { saveAuth, type AuthResponse } from "@/lib/auth";
+
+type ApiValidationError = {
+  message?: string;
+  errors?: Record<string, string[]>;
+};
 
 export default function LoginPage() {
+  const router = useRouter();
+
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+
+  function getFieldError(field: string) {
+    return fieldErrors[field]?.[0];
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setLoading(true);
+    setError("");
+    setFieldErrors({});
+
+    try {
+      const response = await apiFetch<AuthResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          login,
+          password,
+        }),
+      });
+
+      saveAuth(response.token, response.user);
+
+      if (response.user.role === "cleaner") {
+        router.push("/is-talepleri");
+      } else {
+        router.push("/temizlikci-bul");
+      }
+
+      router.refresh();
+    } catch (err) {
+      const apiError = err as ApiValidationError;
+
+      setError(apiError.message || "Giriş işlemi başarısız oldu.");
+      setFieldErrors(apiError.errors || {});
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <main className="page-bottom-space py-8 md:py-14">
       <div className="container-main">
@@ -60,16 +120,29 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              <form className="mt-7 space-y-4">
+              {error && (
+                <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold leading-6 text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="mt-7 space-y-4">
                 <label className="block">
                   <span className="mb-2 block text-sm font-black text-slate-700">
                     Telefon veya E-posta
                   </span>
                   <input
                     type="text"
+                    value={login}
+                    onChange={(e) => setLogin(e.target.value)}
                     placeholder="05xx xxx xx xx veya e-posta"
                     className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none transition focus:border-[#f6a313] focus:bg-white"
                   />
+                  {getFieldError("login") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("login")}
+                    </p>
+                  )}
                 </label>
 
                 <label className="block">
@@ -78,14 +151,25 @@ export default function LoginPage() {
                   </span>
                   <input
                     type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="Şifrenizi girin"
                     className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none transition focus:border-[#f6a313] focus:bg-white"
                   />
+                  {getFieldError("password") && (
+                    <p className="mt-2 text-xs font-bold text-red-600">
+                      {getFieldError("password")}
+                    </p>
+                  )}
                 </label>
 
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <label className="flex items-center gap-2 font-bold text-slate-600">
-                    <input type="checkbox" />
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                    />
                     Beni hatırla
                   </label>
 
@@ -95,10 +179,10 @@ export default function LoginPage() {
                 </div>
 
                 <button
-                  type="button"
-                  className="min-h-14 w-full rounded-full bg-[#06264a] px-6 font-black text-white shadow-lg shadow-blue-950/20 transition hover:bg-[#0b355f]"
-                >
-                  Giriş Yap
+                  type="submit"
+                  disabled={loading}
+                  className="min-h-14 w-full cursor-pointer rounded-full bg-[#06264a] px-6 font-black text-white shadow-lg shadow-blue-950/20 transition hover:bg-[#0b355f] disabled:cursor-not-allowed disabled:opacity-60"                >
+                  {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
                 </button>
               </form>
 

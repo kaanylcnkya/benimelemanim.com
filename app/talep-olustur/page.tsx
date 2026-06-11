@@ -4,45 +4,53 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { services } from "@/lib/site";
-import { apiFetch } from "@/lib/api";
-import { saveAuth, type AuthResponse } from "@/lib/auth";
-import {
-  getCities,
-  getDistricts,
-  type City,
-  type District,
-} from "@/lib/locations";
+import { getAuthUser } from "@/lib/auth";
+import { getCities, getDistricts, type City, type District } from "@/lib/locations";
+import { createJobRequest } from "@/lib/jobRequests";
 
 type ApiValidationError = {
   message?: string;
   errors?: Record<string, string[]>;
 };
 
-export default function CleanerRegisterPage() {
+export default function CreateJobRequestPage() {
   const router = useRouter();
 
   const [cities, setCities] = useState<City[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
 
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [title, setTitle] = useState("");
+  const [serviceType, setServiceType] = useState("");
   const [cityId, setCityId] = useState("");
   const [districtId, setDistrictId] = useState("");
-  const [experience, setExperience] = useState("0-1 yıl");
-  const [dailyPrice, setDailyPrice] = useState("");
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [addressDetail, setAddressDetail] = useState("");
+  const [workDate, setWorkDate] = useState("");
+  const [workTime, setWorkTime] = useState("");
+  const [budget, setBudget] = useState("");
   const [description, setDescription] = useState("");
-  const [kvkkAccepted, setKvkkAccepted] = useState(false);
 
-  const [loading, setLoading] = useState(false);
   const [cityLoading, setCityLoading] = useState(true);
   const [districtLoading, setDistrictLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    const user = getAuthUser();
+
+    if (!user) {
+      router.push("/giris");
+      return;
+    }
+
+    if (user.role !== "customer") {
+      router.push("/is-talepleri");
+      return;
+    }
+
+    setCityId(user.city_id ? String(user.city_id) : "");
+  }, [router]);
 
   useEffect(() => {
     async function loadCities() {
@@ -51,7 +59,7 @@ export default function CleanerRegisterPage() {
         const response = await getCities();
         setCities(response.data);
       } catch {
-        setError("İl listesi yüklenemedi. Lütfen daha sonra tekrar deneyin.");
+        setError("İl listesi yüklenemedi.");
       } finally {
         setCityLoading(false);
       }
@@ -73,8 +81,14 @@ export default function CleanerRegisterPage() {
         setDistrictId("");
         const response = await getDistricts(cityId);
         setDistricts(response.data);
+
+        const user = getAuthUser();
+
+        if (user?.district_id && String(user.city_id) === String(cityId)) {
+          setDistrictId(String(user.district_id));
+        }
       } catch {
-        setError("İlçe listesi yüklenemedi. Lütfen tekrar deneyin.");
+        setError("İlçe listesi yüklenemedi.");
       } finally {
         setDistrictLoading(false);
       }
@@ -87,16 +101,6 @@ export default function CleanerRegisterPage() {
     return fieldErrors[field]?.[0];
   }
 
-  function toggleService(service: string) {
-    setSelectedServices((current) => {
-      if (current.includes(service)) {
-        return current.filter((item) => item !== service);
-      }
-
-      return [...current, service];
-    });
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -105,32 +109,24 @@ export default function CleanerRegisterPage() {
     setFieldErrors({});
 
     try {
-      const response = await apiFetch<AuthResponse>("/auth/register/cleaner", {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          email,
-          phone,
-          city_id: Number(cityId),
-          district_id: Number(districtId),
-          password,
-          password_confirmation: passwordConfirmation,
-          services: selectedServices,
-          experience,
-          daily_price: dailyPrice,
-          description,
-          kvkk_accepted: kvkkAccepted,
-        }),
+      await createJobRequest({
+        title,
+        service_type: serviceType,
+        city_id: Number(cityId),
+        district_id: Number(districtId),
+        address_detail: addressDetail,
+        work_date: workDate,
+        work_time: workTime,
+        budget,
+        description,
       });
 
-      saveAuth(response.token, response.user);
-
-      router.push("/is-talepleri");
+      router.push("/taleplerim");
       router.refresh();
     } catch (err) {
       const apiError = err as ApiValidationError;
 
-      setError(apiError.message || "Kayıt işlemi başarısız oldu.");
+      setError(apiError.message || "Talep oluşturulamadı.");
       setFieldErrors(apiError.errors || {});
     } finally {
       setLoading(false);
@@ -141,37 +137,37 @@ export default function CleanerRegisterPage() {
     <main className="page-bottom-space py-8 md:py-14">
       <div className="container-main">
         <div className="mx-auto max-w-5xl">
-          <Link href="/kayit" className="text-sm font-black text-[#06264a]">
-            ← Üyelik seçimine dön
+          <Link href="/" className="text-sm font-black text-[#06264a]">
+            ← Ana sayfaya dön
           </Link>
 
           <div className="mt-7 grid gap-8 lg:grid-cols-[0.8fr_1.2fr]">
             <aside className="rounded-[2rem] bg-[#06264a] p-7 text-white md:p-9">
               <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-200">
-                Temizlikçi Üyeliği
+                Temizlik Talebi
               </p>
 
               <h1 className="mt-4 text-4xl font-black leading-tight tracking-[-0.05em]">
-                İş taleplerine ulaşmak için profilinizi oluşturun.
+                Temizlik ihtiyacınızı ilan olarak yayınlayın.
               </h1>
 
               <p className="mt-5 text-sm leading-8 text-blue-100">
-                Kayıt olduktan sonra bölgenizdeki temizlik taleplerini
-                görebilir, işveren iletişim bilgilerine ulaşabilirsiniz.
+                Talebiniz bölgenizdeki temizlikçilere gösterilir. Uygun
+                temizlikçiler sizinle iletişime geçebilir.
               </p>
 
               <div className="mt-7 grid gap-3">
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <div className="font-black">Bölgesel talepler</div>
+                  <div className="font-black">Bölgeye göre görünürlük</div>
                   <p className="mt-2 text-sm leading-6 text-blue-100">
-                    Kendi il ve ilçenizdeki iş taleplerini görün.
+                    İlanınız seçtiğiniz il ve ilçedeki temizlikçilere gösterilir.
                   </p>
                 </div>
 
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <div className="font-black">Profil görünürlüğü</div>
+                  <div className="font-black">Kolay iletişim</div>
                   <p className="mt-2 text-sm leading-6 text-blue-100">
-                    Temizlikçi arayan kullanıcılar profilinizi görebilir.
+                    Temizlikçiler talebinizi görüp sizinle iletişime geçebilir.
                   </p>
                 </div>
               </div>
@@ -182,16 +178,16 @@ export default function CleanerRegisterPage() {
               className="soft-card rounded-[2.2rem] p-5 md:p-8"
             >
               <p className="text-xs font-black uppercase tracking-[0.22em] text-[#f6a313]">
-                Ücretsiz Üyelik
+                Yeni Talep
               </p>
 
               <h2 className="mt-3 text-3xl font-black tracking-[-0.05em] text-[#06264a]">
-                Temizlikçi profilinizi oluşturun
+                Talep bilgilerini girin
               </h2>
 
               <p className="mt-3 text-sm leading-7 text-slate-600">
-                Bilgileriniz temizlikçi arayan kullanıcılara profil olarak
-                gösterilecektir.
+                Açık ve net bilgi verirseniz temizlikçiler size daha hızlı
+                dönüş yapabilir.
               </p>
 
               {error && (
@@ -201,85 +197,54 @@ export default function CleanerRegisterPage() {
               )}
 
               <div className="mt-7 grid gap-4 md:grid-cols-2">
-                <label>
+                <label className="md:col-span-2">
                   <span className="mb-2 block text-sm font-black text-slate-700">
-                    Ad Soyad
+                    Talep Başlığı
                   </span>
                   <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Adınız soyadınız"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Örn. Haftalık ev temizliği"
                     className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
                   />
-                  {getFieldError("name") && (
+                  {getFieldError("title") && (
                     <p className="mt-2 text-xs font-bold text-red-600">
-                      {getFieldError("name")}
+                      {getFieldError("title")}
                     </p>
                   )}
                 </label>
 
                 <label>
                   <span className="mb-2 block text-sm font-black text-slate-700">
-                    Telefon
+                    Hizmet Türü
                   </span>
-                  <input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="05xx xxx xx xx"
+                  <select
+                    value={serviceType}
+                    onChange={(e) => setServiceType(e.target.value)}
                     className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
-                  />
-                  {getFieldError("phone") && (
+                  >
+                    <option value="">Hizmet seçiniz</option>
+                    {services.map((service) => (
+                      <option key={service} value={service}>
+                        {service}
+                      </option>
+                    ))}
+                  </select>
+                  {getFieldError("service_type") && (
                     <p className="mt-2 text-xs font-bold text-red-600">
-                      {getFieldError("phone")}
+                      {getFieldError("service_type")}
                     </p>
                   )}
                 </label>
 
                 <label>
                   <span className="mb-2 block text-sm font-black text-slate-700">
-                    E-posta
+                    Bütçe
                   </span>
                   <input
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    type="email"
-                    placeholder="ornek@mail.com"
-                    className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
-                  />
-                  {getFieldError("email") && (
-                    <p className="mt-2 text-xs font-bold text-red-600">
-                      {getFieldError("email")}
-                    </p>
-                  )}
-                </label>
-
-                <label>
-                  <span className="mb-2 block text-sm font-black text-slate-700">
-                    Şifre
-                  </span>
-                  <input
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    type="password"
-                    placeholder="Şifre oluşturun"
-                    className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
-                  />
-                  {getFieldError("password") && (
-                    <p className="mt-2 text-xs font-bold text-red-600">
-                      {getFieldError("password")}
-                    </p>
-                  )}
-                </label>
-
-                <label>
-                  <span className="mb-2 block text-sm font-black text-slate-700">
-                    Şifre Tekrarı
-                  </span>
-                  <input
-                    value={passwordConfirmation}
-                    onChange={(e) => setPasswordConfirmation(e.target.value)}
-                    type="password"
-                    placeholder="Şifrenizi tekrar girin"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                    placeholder="Örn. 1500 TL"
                     className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
                   />
                 </label>
@@ -340,84 +305,50 @@ export default function CleanerRegisterPage() {
 
                 <label>
                   <span className="mb-2 block text-sm font-black text-slate-700">
-                    Deneyim
+                    Tarih
                   </span>
-                  <select
-                    value={experience}
-                    onChange={(e) => setExperience(e.target.value)}
+                  <input
+                    value={workDate}
+                    onChange={(e) => setWorkDate(e.target.value)}
+                    type="date"
                     className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
-                  >
-                    <option>0-1 yıl</option>
-                    <option>1-3 yıl</option>
-                    <option>3-5 yıl</option>
-                    <option>5 yıl ve üzeri</option>
-                  </select>
-                  {getFieldError("experience") && (
-                    <p className="mt-2 text-xs font-bold text-red-600">
-                      {getFieldError("experience")}
-                    </p>
-                  )}
+                  />
                 </label>
 
                 <label>
                   <span className="mb-2 block text-sm font-black text-slate-700">
-                    Günlük Ücret Beklentisi
+                    Saat
                   </span>
                   <input
-                    value={dailyPrice}
-                    onChange={(e) => setDailyPrice(e.target.value)}
-                    placeholder="Örn. 1.500 TL"
+                    value={workTime}
+                    onChange={(e) => setWorkTime(e.target.value)}
+                    placeholder="Örn. 10:00 veya fark etmez"
                     className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
                   />
-                  {getFieldError("daily_price") && (
-                    <p className="mt-2 text-xs font-bold text-red-600">
-                      {getFieldError("daily_price")}
-                    </p>
-                  )}
                 </label>
-              </div>
 
-              <div className="mt-5">
-                <span className="mb-3 block text-sm font-black text-slate-700">
-                  Verdiğiniz hizmetler
-                </span>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {services.map((service) => (
-                    <label
-                      key={service}
-                      className={`flex cursor-pointer items-center gap-3 rounded-2xl p-4 text-sm font-bold transition ${
-                        selectedServices.includes(service)
-                          ? "bg-orange-50 text-[#06264a] ring-2 ring-[#f6a313]"
-                          : "bg-slate-50 text-slate-700"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedServices.includes(service)}
-                        onChange={() => toggleService(service)}
-                      />
-                      {service}
-                    </label>
-                  ))}
-                </div>
-
-                {getFieldError("services") && (
-                  <p className="mt-2 text-xs font-bold text-red-600">
-                    {getFieldError("services")}
-                  </p>
-                )}
+                <label className="md:col-span-2">
+                  <span className="mb-2 block text-sm font-black text-slate-700">
+                    Adres Detayı
+                  </span>
+                  <input
+                    value={addressDetail}
+                    onChange={(e) => setAddressDetail(e.target.value)}
+                    placeholder="Mahalle, cadde veya kısa adres bilgisi"
+                    className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
+                  />
+                </label>
               </div>
 
               <label className="mt-5 block">
                 <span className="mb-2 block text-sm font-black text-slate-700">
-                  Kısa açıklama
+                  Açıklama
                 </span>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={5}
-                  placeholder="Kendinizden, deneyiminizden ve çalışabileceğiniz bölgelerden bahsedin."
+                  placeholder="Ev büyüklüğü, oda sayısı, beklentiler ve özel notları yazabilirsiniz."
                   className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
                 />
                 {getFieldError("description") && (
@@ -427,39 +358,18 @@ export default function CleanerRegisterPage() {
                 )}
               </label>
 
-              <label className="mt-5 flex gap-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={kvkkAccepted}
-                  onChange={(e) => setKvkkAccepted(e.target.checked)}
-                  className="mt-1"
-                />
-                <span>
-                  KVKK Aydınlatma Metni ve Kullanım Şartları’nı okudum, kabul
-                  ediyorum.
-                </span>
-              </label>
-
-              {getFieldError("kvkk_accepted") && (
-                <p className="mt-2 text-xs font-bold text-red-600">
-                  {getFieldError("kvkk_accepted")}
-                </p>
-              )}
-
               <button
                 type="submit"
                 disabled={loading}
                 className="mt-6 min-h-14 w-full cursor-pointer rounded-full bg-[#f6a313] px-6 font-black text-white shadow-lg shadow-orange-400/25 transition hover:bg-[#e58f00] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading
-                  ? "Kayıt oluşturuluyor..."
-                  : "Temizlikçi Olarak Üye Ol"}
+                {loading ? "Talep oluşturuluyor..." : "Talebi Yayınla"}
               </button>
 
               <div className="mt-6 text-center text-sm font-bold text-slate-600">
-                Zaten hesabınız var mı?{" "}
-                <Link href="/giris" className="font-black text-[#06264a]">
-                  Giriş yapın
+                Mevcut taleplerinizi görmek için{" "}
+                <Link href="/taleplerim" className="font-black text-[#06264a]">
+                  Taleplerim
                 </Link>
               </div>
             </form>
