@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAuthUser, type AuthUser } from "@/lib/auth";
 import { services } from "@/lib/site";
 import {
@@ -10,7 +10,13 @@ import {
   type City,
   type District,
 } from "@/lib/locations";
-import { getCleaners, type Cleaner } from "@/lib/cleaners";
+import {
+  getCleaners,
+  type Cleaner,
+  type CleanerPaginationMeta,
+} from "@/lib/cleaners";
+import PageLoader from "@/components/ui/PageLoader";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
 function getInitials(name: string) {
   return name
@@ -102,6 +108,15 @@ function CustomerContactBox({ cleaner }: { cleaner: Cleaner }) {
   );
 }
 
+const emptyMeta: CleanerPaginationMeta = {
+  current_page: 1,
+  last_page: 1,
+  per_page: 12,
+  total: 0,
+  from: null,
+  to: null,
+};
+
 export default function FindCleanerPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
 
@@ -113,23 +128,62 @@ export default function FindCleanerPage() {
   const [districtId, setDistrictId] = useState("");
   const [serviceType, setServiceType] = useState("");
 
+  const [meta, setMeta] = useState<CleanerPaginationMeta>(emptyMeta);
+
   const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(false);
   const [cityLoading, setCityLoading] = useState(true);
   const [districtLoading, setDistrictLoading] = useState(false);
 
   const [error, setError] = useState("");
 
-  async function loadCleaners() {
+  const cityOptions = useMemo(
+    () =>
+      cities.map((city) => ({
+        value: String(city.id),
+        label: city.name,
+      })),
+    [cities]
+  );
+
+  const districtOptions = useMemo(
+    () =>
+      districts.map((district) => ({
+        value: String(district.id),
+        label: district.name,
+      })),
+    [districts]
+  );
+
+  const serviceOptions = useMemo(
+    () =>
+      services.map((service: string) => ({
+        value: service,
+        label: service,
+      })),
+    []
+  );
+
+  async function loadCleaners(nextPage = 1, customFilters?: {
+    city_id?: string;
+    district_id?: string;
+    service_type?: string;
+  }) {
     try {
       setLoading(true);
+      setPageLoading(true);
       setError("");
 
       const response = await getCleaners({
-        city_id: cityId,
-        district_id: districtId,
+        city_id: customFilters?.city_id ?? cityId,
+        district_id: customFilters?.district_id ?? districtId,
+        service_type: customFilters?.service_type ?? serviceType,
+        page: String(nextPage),
+        per_page: "12",
       });
 
       setCleaners(response.data);
+      setMeta(response.meta || emptyMeta);
     } catch (err) {
       const apiError = err as { message?: string };
 
@@ -137,9 +191,24 @@ export default function FindCleanerPage() {
         apiError.message ||
           "Temizlikçiler yüklenemedi. Lütfen tekrar deneyin."
       );
+      setCleaners([]);
+      setMeta(emptyMeta);
     } finally {
       setLoading(false);
+      setPageLoading(false);
     }
+  }
+
+  function clearFilters() {
+    setCityId("");
+    setDistrictId("");
+    setServiceType("");
+    setDistricts([]);
+    loadCleaners(1, {
+      city_id: "",
+      district_id: "",
+      service_type: "",
+    });
   }
 
   useEffect(() => {
@@ -147,7 +216,7 @@ export default function FindCleanerPage() {
   }, []);
 
   useEffect(() => {
-    loadCleaners();
+    loadCleaners(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -194,16 +263,12 @@ export default function FindCleanerPage() {
     loadDistricts();
   }, [cityId]);
 
-  const filteredCleaners = serviceType
-    ? cleaners.filter((cleaner) =>
-        cleaner.cleaner_profile?.services?.includes(serviceType)
-      )
-    : cleaners;
-
   const canSeeContact = user?.role === "customer" || user?.role === "admin";
 
   return (
     <main className="page-bottom-space py-8 md:py-14">
+      {pageLoading && <PageLoader text="Liste güncelleniyor..." />}
+
       <div className="container-main">
         <div className="mx-auto max-w-6xl">
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
@@ -237,54 +302,37 @@ export default function FindCleanerPage() {
 
           <div className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)] md:p-5">
             <div className="grid gap-3 md:grid-cols-5">
-              <select
+              <SearchableSelect
                 value={cityId}
-                onChange={(e) => setCityId(e.target.value)}
+                onChange={setCityId}
+                options={cityOptions}
+                placeholder={cityLoading ? "İller yükleniyor..." : "Tüm İller"}
+                searchPlaceholder="İl ara..."
                 disabled={cityLoading}
-                className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
-              >
-                <option value="">
-                  {cityLoading ? "İller yükleniyor..." : "Tüm İller"}
-                </option>
-                {cities.map((city) => (
-                  <option key={city.id} value={city.id}>
-                    {city.name}
-                  </option>
-                ))}
-              </select>
+              />
 
-              <select
+              <SearchableSelect
                 value={districtId}
-                onChange={(e) => setDistrictId(e.target.value)}
+                onChange={setDistrictId}
+                options={districtOptions}
+                placeholder={
+                  districtLoading ? "İlçeler yükleniyor..." : "Tüm İlçeler"
+                }
+                searchPlaceholder="İlçe ara..."
                 disabled={!cityId || districtLoading}
-                className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
-              >
-                <option value="">
-                  {districtLoading ? "İlçeler yükleniyor..." : "Tüm İlçeler"}
-                </option>
-                {districts.map((district) => (
-                  <option key={district.id} value={district.id}>
-                    {district.name}
-                  </option>
-                ))}
-              </select>
+              />
 
-              <select
+              <SearchableSelect
                 value={serviceType}
-                onChange={(e) => setServiceType(e.target.value)}
-                className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
-              >
-                <option value="">Tüm Hizmetler</option>
-                {services.map((service) => (
-                  <option key={service} value={service}>
-                    {service}
-                  </option>
-                ))}
-              </select>
+                onChange={setServiceType}
+                options={serviceOptions}
+                placeholder="Tüm Hizmetler"
+                searchPlaceholder="Hizmet ara..."
+              />
 
               <button
                 type="button"
-                onClick={loadCleaners}
+                onClick={() => loadCleaners(1)}
                 className="min-h-12 cursor-pointer rounded-2xl bg-[#06264a] px-5 text-sm font-black text-white transition hover:bg-[#0b355f]"
               >
                 Temizlikçi Getir
@@ -292,16 +340,7 @@ export default function FindCleanerPage() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setCityId("");
-                  setDistrictId("");
-                  setServiceType("");
-                  setDistricts([]);
-
-                  setTimeout(() => {
-                    loadCleaners();
-                  }, 0);
-                }}
+                onClick={clearFilters}
                 className="min-h-12 cursor-pointer rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-[#06264a] transition hover:border-[#f6a313] hover:text-[#f6a313]"
               >
                 Filtreyi Temizle
@@ -310,7 +349,7 @@ export default function FindCleanerPage() {
           </div>
 
           <div className="mt-5">
-            {loading && (
+            {loading && !pageLoading && (
               <div className="grid gap-4">
                 {[1, 2, 3].map((item) => (
                   <div
@@ -331,7 +370,7 @@ export default function FindCleanerPage() {
               </div>
             )}
 
-            {!loading && !error && filteredCleaners.length === 0 && (
+            {!loading && !error && cleaners.length === 0 && (
               <div className="rounded-[1.8rem] bg-white p-8 text-center shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-orange-50 text-2xl">
                   🧹
@@ -355,84 +394,107 @@ export default function FindCleanerPage() {
               </div>
             )}
 
-            {!loading && !error && filteredCleaners.length > 0 && (
-              <div className="grid gap-4">
-                {filteredCleaners.map((cleaner) => (
-                  <article
-                    key={cleaner.id}
-                    className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-200/70 md:p-6"
-                  >
-                    <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-[#06264a] text-xl font-black text-white">
-                            {getInitials(cleaner.name)}
-                          </div>
+            {!loading && !error && cleaners.length > 0 && (
+              <>
+                <div className="mb-4 rounded-[1.4rem] border border-slate-200 bg-white px-5 py-4 text-sm font-bold text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.05)]">
+                  Toplam{" "}
+                  <span className="font-black text-[#06264a]">
+                    {meta.total}
+                  </span>{" "}
+                  temizlikçi bulundu.
+                  {meta.from && meta.to && (
+                    <>
+                      {" "}
+                      Şu an{" "}
+                      <span className="font-black text-[#06264a]">
+                        {meta.from}
+                      </span>
+                      -
+                      <span className="font-black text-[#06264a]">
+                        {meta.to}
+                      </span>{" "}
+                      arası gösteriliyor.
+                    </>
+                  )}
+                </div>
 
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h2 className="text-2xl font-black tracking-[-0.04em] text-[#06264a]">
-                                {cleaner.name}
-                              </h2>
+                <div className="grid gap-4">
+                  {cleaners.map((cleaner) => (
+                    <article
+                      key={cleaner.id}
+                      className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-200/70 md:p-6"
+                    >
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-[#06264a] text-xl font-black text-white">
+                              {getInitials(cleaner.name)}
+                            </div>
 
-                              {cleaner.cleaner_profile?.is_verified && (
-                                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">
-                                  Onaylı
-                                </span>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h2 className="text-2xl font-black tracking-[-0.04em] text-[#06264a]">
+                                  {cleaner.name}
+                                </h2>
+
+                                {cleaner.cleaner_profile?.is_verified && (
+                                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">
+                                    Onaylı
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="mt-2 text-sm font-black text-[#f6a313]">
+                                {cleaner.city?.name || "-"}
+                                {cleaner.district?.name
+                                  ? ` / ${cleaner.district.name}`
+                                  : ""}
+                              </p>
+
+                              {cleaner.cleaner_profile?.description && (
+                                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
+                                  {cleaner.cleaner_profile.description}
+                                </p>
                               )}
                             </div>
-
-                            <p className="mt-2 text-sm font-black text-[#f6a313]">
-                              {cleaner.city?.name || "-"}
-                              {cleaner.district?.name
-                                ? ` / ${cleaner.district.name}`
-                                : ""}
-                            </p>
-
-                            {cleaner.cleaner_profile?.description && (
-                              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
-                                {cleaner.cleaner_profile.description}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="mt-5 grid gap-3 text-sm md:grid-cols-3">
-                          <div className="rounded-2xl bg-slate-50 p-4">
-                            <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                              Deneyim
-                            </div>
-                            <div className="mt-2 font-black text-[#06264a]">
-                              {cleaner.cleaner_profile?.experience ||
-                                "Belirtilmedi"}
-                            </div>
                           </div>
 
-                          <div className="rounded-2xl bg-slate-50 p-4">
-                            <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                              Günlük Ücret
+                          <div className="mt-5 grid gap-3 text-sm md:grid-cols-3">
+                            <div className="rounded-2xl bg-slate-50 p-4">
+                              <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                Deneyim
+                              </div>
+                              <div className="mt-2 font-black text-[#06264a]">
+                                {cleaner.cleaner_profile?.experience ||
+                                  "Belirtilmedi"}
+                              </div>
                             </div>
-                            <div className="mt-2 font-black text-[#06264a]">
-                              {cleaner.cleaner_profile?.daily_price ||
-                                "Belirtilmedi"}
+
+                            <div className="rounded-2xl bg-slate-50 p-4">
+                              <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                Günlük Ücret
+                              </div>
+                              <div className="mt-2 font-black text-[#06264a]">
+                                {cleaner.cleaner_profile?.daily_price ||
+                                  "Belirtilmedi"}
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl bg-slate-50 p-4">
+                              <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                Hizmet Sayısı
+                              </div>
+                              <div className="mt-2 font-black text-[#06264a]">
+                                {cleaner.cleaner_profile?.services?.length || 0}
+                              </div>
                             </div>
                           </div>
 
-                          <div className="rounded-2xl bg-slate-50 p-4">
-                            <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                              Hizmet Sayısı
-                            </div>
-                            <div className="mt-2 font-black text-[#06264a]">
-                              {cleaner.cleaner_profile?.services?.length || 0}
-                            </div>
-                          </div>
-                        </div>
-
-                        {cleaner.cleaner_profile?.services &&
-                          cleaner.cleaner_profile.services.length > 0 && (
+                          {(cleaner.cleaner_profile?.services ?? []).length >
+                            0 && (
                             <div className="mt-5 flex flex-wrap gap-2">
-                              {cleaner.cleaner_profile.services.map(
-                                (service) => (
+                              {(cleaner.cleaner_profile?.services ?? []).map(
+                                (service: string) => (
                                   <span
                                     key={service}
                                     className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-[#b86b00] ring-1 ring-orange-100"
@@ -443,19 +505,55 @@ export default function FindCleanerPage() {
                               )}
                             </div>
                           )}
-                      </div>
+                        </div>
 
-                      <div className="shrink-0 lg:w-80">
-                        {canSeeContact ? (
-                          <CustomerContactBox cleaner={cleaner} />
-                        ) : (
-                          <LockedContactBox />
-                        )}
+                        <div className="shrink-0 lg:w-80">
+                          {canSeeContact ? (
+                            <CustomerContactBox cleaner={cleaner} />
+                          ) : (
+                            <LockedContactBox />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex flex-col items-center justify-between gap-4 rounded-[1.5rem] border border-slate-200 bg-white p-4 text-sm font-bold text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.05)] md:flex-row">
+                  <div>
+                    Sayfa{" "}
+                    <span className="font-black text-[#06264a]">
+                      {meta.current_page}
+                    </span>{" "}
+                    /{" "}
+                    <span className="font-black text-[#06264a]">
+                      {meta.last_page}
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={meta.current_page <= 1 || pageLoading}
+                      onClick={() => loadCleaners(meta.current_page - 1)}
+                      className="min-h-11 cursor-pointer rounded-full border border-slate-200 bg-white px-5 text-sm font-black text-[#06264a] transition hover:border-[#f6a313] hover:text-[#f6a313] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Önceki
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={
+                        meta.current_page >= meta.last_page || pageLoading
+                      }
+                      onClick={() => loadCleaners(meta.current_page + 1)}
+                      className="min-h-11 cursor-pointer rounded-full bg-[#06264a] px-5 text-sm font-black text-white transition hover:bg-[#0b355f] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Sonraki
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
