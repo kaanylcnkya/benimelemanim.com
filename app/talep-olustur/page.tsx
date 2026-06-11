@@ -5,7 +5,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { services } from "@/lib/site";
 import { getAuthUser } from "@/lib/auth";
-import { getCities, getDistricts, type City, type District } from "@/lib/locations";
+import {
+  getCities,
+  getDistricts,
+  type City,
+  type District,
+} from "@/lib/locations";
 import { createJobRequest } from "@/lib/jobRequests";
 
 type ApiValidationError = {
@@ -15,6 +20,8 @@ type ApiValidationError = {
 
 export default function CreateJobRequestPage() {
   const router = useRouter();
+
+  const [authChecked, setAuthChecked] = useState(false);
 
   const [cities, setCities] = useState<City[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
@@ -40,19 +47,27 @@ export default function CreateJobRequestPage() {
     const user = getAuthUser();
 
     if (!user) {
-      router.push("/giris");
+      router.replace("/giris");
+      return;
+    }
+
+    if (user.role === "cleaner") {
+      router.replace("/is-talepleri");
       return;
     }
 
     if (user.role !== "customer") {
-      router.push("/is-talepleri");
+      router.replace("/");
       return;
     }
 
     setCityId(user.city_id ? String(user.city_id) : "");
+    setAuthChecked(true);
   }, [router]);
 
   useEffect(() => {
+    if (!authChecked) return;
+
     async function loadCities() {
       try {
         setCityLoading(true);
@@ -66,7 +81,7 @@ export default function CreateJobRequestPage() {
     }
 
     loadCities();
-  }, []);
+  }, [authChecked]);
 
   useEffect(() => {
     async function loadDistricts() {
@@ -79,6 +94,7 @@ export default function CreateJobRequestPage() {
       try {
         setDistrictLoading(true);
         setDistrictId("");
+
         const response = await getDistricts(cityId);
         setDistricts(response.data);
 
@@ -104,6 +120,18 @@ export default function CreateJobRequestPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const user = getAuthUser();
+
+    if (!user) {
+      router.replace("/giris");
+      return;
+    }
+
+    if (user.role !== "customer") {
+      router.replace(user.role === "cleaner" ? "/is-talepleri" : "/");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setFieldErrors({});
@@ -121,7 +149,7 @@ export default function CreateJobRequestPage() {
         description,
       });
 
-      router.push("/taleplerim");
+      router.replace("/taleplerim");
       router.refresh();
     } catch (err) {
       const apiError = err as ApiValidationError;
@@ -131,6 +159,10 @@ export default function CreateJobRequestPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!authChecked) {
+    return null;
   }
 
   return (
@@ -224,7 +256,7 @@ export default function CreateJobRequestPage() {
                     className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
                   >
                     <option value="">Hizmet seçiniz</option>
-                    {services.map((service) => (
+                    {services.map((service: string) => (
                       <option key={service} value={service}>
                         {service}
                       </option>
@@ -257,7 +289,7 @@ export default function CreateJobRequestPage() {
                     value={cityId}
                     onChange={(e) => setCityId(e.target.value)}
                     disabled={cityLoading}
-                    className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
+                    className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <option value="">
                       {cityLoading ? "İller yükleniyor..." : "İl seçiniz"}
@@ -283,7 +315,7 @@ export default function CreateJobRequestPage() {
                     value={districtId}
                     onChange={(e) => setDistrictId(e.target.value)}
                     disabled={!cityId || districtLoading}
-                    className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
+                    className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <option value="">
                       {districtLoading

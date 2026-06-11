@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getAuthUser, type AuthUser } from "@/lib/auth";
+import { useEffect, useMemo, useState } from "react";
+import { clearAuth, getAuthUser, type AuthUser } from "@/lib/auth";
 import { getOpenJobRequests, type JobRequest } from "@/lib/jobRequests";
 import { services } from "@/lib/site";
 import {
@@ -11,6 +11,13 @@ import {
   type City,
   type District,
 } from "@/lib/locations";
+import PageLoader from "@/components/ui/PageLoader";
+import SearchableSelect from "@/components/ui/SearchableSelect";
+
+type ApiError = {
+  status?: number;
+  message?: string;
+};
 
 const previewJobs = [
   {
@@ -206,7 +213,8 @@ function CustomerView() {
 
 function CleanerJobRequests() {
   const [jobRequests, setJobRequests] = useState<JobRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(false);
   const [error, setError] = useState("");
 
   const [cities, setCities] = useState<City[]>([]);
@@ -219,22 +227,85 @@ function CleanerJobRequests() {
   const [cityLoading, setCityLoading] = useState(true);
   const [districtLoading, setDistrictLoading] = useState(false);
 
-  async function loadJobRequests() {
+  const cityOptions = useMemo(
+    () =>
+      cities.map((city) => ({
+        value: String(city.id),
+        label: city.name,
+      })),
+    [cities]
+  );
+
+  const districtOptions = useMemo(
+    () =>
+      districts.map((district) => ({
+        value: String(district.id),
+        label: district.name,
+      })),
+    [districts]
+  );
+
+  const serviceOptions = useMemo(
+    () =>
+      services.map((service: string) => ({
+        value: service,
+        label: service,
+      })),
+    []
+  );
+
+  async function loadJobRequests(
+    customFilters?: {
+      city_id?: string;
+      district_id?: string;
+      service_type?: string;
+    }
+  ) {
     try {
-      setLoading(true);
+      setListLoading(true);
       setError("");
 
       const response = await getOpenJobRequests({
-        city_id: cityId,
-        district_id: districtId,
+        city_id: customFilters?.city_id ?? cityId,
+        district_id: customFilters?.district_id ?? districtId,
       });
 
-      setJobRequests(response.data);
-    } catch {
-      setError("İş talepleri yüklenemedi. Lütfen tekrar deneyin.");
+      const selectedService = customFilters?.service_type ?? serviceType;
+
+      const filtered = selectedService
+        ? response.data.filter((job) => job.service_type === selectedService)
+        : response.data;
+
+      setJobRequests(filtered);
+    } catch (err) {
+      const apiError = err as ApiError;
+
+      if (apiError.status === 401) {
+        clearAuth();
+        setError("Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.");
+        return;
+      }
+
+      setError(
+        apiError.message || "İş talepleri yüklenemedi. Lütfen tekrar deneyin."
+      );
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setListLoading(false);
     }
+  }
+
+  function clearFilters() {
+    setCityId("");
+    setDistrictId("");
+    setServiceType("");
+    setDistricts([]);
+
+    loadJobRequests({
+      city_id: "",
+      district_id: "",
+      service_type: "",
+    });
   }
 
   useEffect(() => {
@@ -285,10 +356,6 @@ function CleanerJobRequests() {
     loadDistricts();
   }, [cityId]);
 
-  const filteredJobRequests = serviceType
-    ? jobRequests.filter((job) => job.service_type === serviceType)
-    : jobRequests;
-
   return (
     <main className="page-bottom-space py-8 md:py-14">
       <div className="container-main">
@@ -303,258 +370,247 @@ function CleanerJobRequests() {
             </p>
 
             <h1 className="mt-3 text-4xl font-black tracking-[-0.06em] text-[#06264a] md:text-5xl">
-              Bölgenizdeki açık temizlik işleri
+              Açık temizlik işleri
             </h1>
 
             <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
-              Size yakın bölgelerde yayınlanan temizlik taleplerini inceleyin ve
-              müşteriyle doğrudan iletişime geçin.
+              Yayındaki temizlik taleplerini inceleyin ve müşteriyle doğrudan
+              iletişime geçin.
             </p>
           </div>
 
           <div className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)] md:p-5">
             <div className="grid gap-3 md:grid-cols-5">
-              <select
+              <SearchableSelect
                 value={cityId}
-                onChange={(e) => setCityId(e.target.value)}
+                onChange={setCityId}
+                options={cityOptions}
+                placeholder={cityLoading ? "İller yükleniyor..." : "Tüm İller"}
+                searchPlaceholder="İl ara..."
                 disabled={cityLoading}
-                className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
-              >
-                <option value="">
-                  {cityLoading ? "İller yükleniyor..." : "Tüm İller"}
-                </option>
-                {cities.map((city) => (
-                  <option key={city.id} value={city.id}>
-                    {city.name}
-                  </option>
-                ))}
-              </select>
+              />
 
-              <select
+              <SearchableSelect
                 value={districtId}
-                onChange={(e) => setDistrictId(e.target.value)}
+                onChange={setDistrictId}
+                options={districtOptions}
+                placeholder={
+                  districtLoading ? "İlçeler yükleniyor..." : "Tüm İlçeler"
+                }
+                searchPlaceholder="İlçe ara..."
                 disabled={!cityId || districtLoading}
-                className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
-              >
-                <option value="">
-                  {districtLoading ? "İlçeler yükleniyor..." : "Tüm İlçeler"}
-                </option>
-                {districts.map((district) => (
-                  <option key={district.id} value={district.id}>
-                    {district.name}
-                  </option>
-                ))}
-              </select>
+              />
 
-              <select
+              <SearchableSelect
                 value={serviceType}
-                onChange={(e) => setServiceType(e.target.value)}
-                className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none focus:border-[#f6a313] focus:bg-white"
-              >
-                <option value="">Tüm Hizmetler</option>
-                {services.map((service) => (
-                  <option key={service} value={service}>
-                    {service}
-                  </option>
-                ))}
-              </select>
+                onChange={setServiceType}
+                options={serviceOptions}
+                placeholder="Tüm Hizmetler"
+                searchPlaceholder="Hizmet ara..."
+              />
 
               <button
                 type="button"
-                onClick={loadJobRequests}
-                className="min-h-12 cursor-pointer rounded-2xl bg-[#06264a] px-5 text-sm font-black text-white transition hover:bg-[#0b355f]"
+                onClick={() => loadJobRequests()}
+                disabled={listLoading}
+                className="min-h-12 cursor-pointer rounded-2xl bg-[#06264a] px-5 text-sm font-black text-white transition hover:bg-[#0b355f] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Talepleri Getir
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  setCityId("");
-                  setDistrictId("");
-                  setServiceType("");
-                  setDistricts([]);
-                  setTimeout(() => {
-                    loadJobRequests();
-                  }, 0);
-                }}
-                className="min-h-12 cursor-pointer rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-[#06264a] transition hover:border-[#f6a313] hover:text-[#f6a313]"
+                onClick={clearFilters}
+                disabled={listLoading}
+                className="min-h-12 cursor-pointer rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-[#06264a] transition hover:border-[#f6a313] hover:text-[#f6a313] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Filtreyi Temizle
               </button>
             </div>
           </div>
 
-          <div className="mt-5 rounded-[2.2rem] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] md:p-6">
-            {loading && (
-              <div className="grid gap-4">
-                {[1, 2, 3].map((item) => (
-                  <div
-                    key={item}
-                    className="animate-pulse rounded-[1.6rem] bg-slate-50 p-5"
-                  >
-                    <div className="h-5 w-2/5 rounded-full bg-slate-200" />
-                    <div className="mt-4 h-4 w-3/5 rounded-full bg-slate-200" />
-                    <div className="mt-3 h-4 w-1/2 rounded-full bg-slate-200" />
-                  </div>
-                ))}
-              </div>
+          <div className="relative mt-5 min-h-[260px] rounded-[2.2rem] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] md:p-6">
+            {listLoading && !initialLoading && (
+              <PageLoader text="Talepler güncelleniyor..." />
             )}
 
-            {!loading && error && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">
-                {error}
-              </div>
-            )}
-
-            {!loading && !error && filteredJobRequests.length === 0 && (
-              <div className="rounded-[1.8rem] bg-slate-50 p-8 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-2xl shadow-sm">
-                  📭
-                </div>
-
-                <h2 className="mt-5 text-2xl font-black tracking-[-0.04em] text-[#06264a]">
-                  Şu an uygun iş talebi yok
-                </h2>
-
-                <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-slate-600">
-                  Filtreleri değiştirebilir veya daha sonra tekrar kontrol
-                  edebilirsiniz.
-                </p>
-              </div>
-            )}
-
-            {!loading && !error && filteredJobRequests.length > 0 && (
-              <div className="grid gap-4">
-                {filteredJobRequests.map((job) => (
-                  <article
-                    key={job.id}
-                    className="rounded-[1.8rem] border border-slate-200 bg-slate-50 p-5 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-lg hover:shadow-slate-200/60 md:p-6"
-                  >
-                    <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
-                            Açık Talep
-                          </span>
-
-                          <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-[#b86b00]">
-                            {job.service_type}
-                          </span>
-
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 ring-1 ring-slate-200">
-                            #{job.id}
-                          </span>
-                        </div>
-
-                        <h2 className="mt-4 text-2xl font-black tracking-[-0.04em] text-[#06264a]">
-                          {job.title}
-                        </h2>
-
-                        {job.description && (
-                          <p className="mt-4 text-sm leading-7 text-slate-600">
-                            {job.description}
-                          </p>
-                        )}
-
-                        <div className="mt-5 grid gap-3 text-sm text-slate-600 md:grid-cols-2">
-                          <div className="rounded-2xl bg-white p-4">
-                            <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                              Konum
-                            </div>
-                            <div className="mt-2 font-black text-[#06264a]">
-                              {job.city?.name || "-"}
-                              {job.district?.name
-                                ? ` / ${job.district.name}`
-                                : ""}
-                            </div>
-                          </div>
-
-                          <div className="rounded-2xl bg-white p-4">
-                            <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                              Tarih / Saat
-                            </div>
-                            <div className="mt-2 font-black text-[#06264a]">
-                              {job.work_date || "Tarih belirtilmedi"}
-                              {job.work_time ? ` - ${job.work_time}` : ""}
-                            </div>
-                          </div>
-
-                          <div className="rounded-2xl bg-white p-4">
-                            <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                              Bütçe
-                            </div>
-                            <div className="mt-2 font-black text-[#06264a]">
-                              {job.budget || "Belirtilmedi"}
-                            </div>
-                          </div>
-
-                          <div className="rounded-2xl bg-white p-4">
-                            <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                              Adres Detayı
-                            </div>
-                            <div className="mt-2 font-black text-[#06264a]">
-                              {job.address_detail || "Belirtilmedi"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 rounded-[1.6rem] bg-[#06264a] p-5 text-white lg:w-80">
-                        <div className="text-xs font-black uppercase tracking-[0.18em] text-orange-200">
-                          Müşteri Bilgileri
-                        </div>
-
-                        <div className="mt-4 text-xl font-black">
-                          {job.customer?.name || "Müşteri"}
-                        </div>
-
-                        <div className="mt-4 grid gap-3">
-                          {job.customer?.phone && (
-                            <a
-                              href={`tel:${job.customer.phone}`}
-                              className="flex min-h-12 items-center justify-center rounded-full bg-[#f6a313] px-5 text-sm font-black text-white transition hover:bg-[#e58f00]"
-                            >
-                              Ara: {job.customer.phone}
-                            </a>
-                          )}
-
-                          {job.customer?.phone && (
-                            <a
-                              href={`https://wa.me/9${job.customer.phone.replace(
-                                /\D/g,
-                                ""
-                              )}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex min-h-12 items-center justify-center rounded-full bg-white px-5 text-sm font-black text-[#06264a] transition hover:bg-blue-50"
-                            >
-                              WhatsApp ile Yaz
-                            </a>
-                          )}
-
-                          {job.customer?.email && (
-                            <a
-                              href={`mailto:${job.customer.email}`}
-                              className="flex min-h-12 items-center justify-center rounded-full border border-white/20 px-5 text-sm font-black text-white transition hover:bg-white/10"
-                            >
-                              E-posta Gönder
-                            </a>
-                          )}
-                        </div>
-
-                        {!job.customer?.phone && !job.customer?.email && (
-                          <p className="mt-4 rounded-2xl bg-white/10 p-4 text-xs leading-6 text-blue-100">
-                            Bu talep için iletişim bilgisi henüz
-                            görüntülenemiyor.
-                          </p>
-                        )}
-                      </div>
+            <div
+              className={`transition duration-300 ${
+                listLoading && !initialLoading
+                  ? "scale-[0.995] opacity-40 blur-[1px]"
+                  : "scale-100 opacity-100 blur-0"
+              }`}
+            >
+              {initialLoading && (
+                <div className="grid gap-4">
+                  {[1, 2, 3].map((item) => (
+                    <div
+                      key={item}
+                      className="animate-pulse rounded-[1.6rem] bg-slate-50 p-5"
+                    >
+                      <div className="h-5 w-2/5 rounded-full bg-slate-200" />
+                      <div className="mt-4 h-4 w-3/5 rounded-full bg-slate-200" />
+                      <div className="mt-3 h-4 w-1/2 rounded-full bg-slate-200" />
                     </div>
-                  </article>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+
+              {!initialLoading && error && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">
+                  {error}
+                </div>
+              )}
+
+              {!initialLoading && !error && jobRequests.length === 0 && (
+                <div className="rounded-[1.8rem] bg-slate-50 p-8 text-center">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-2xl shadow-sm">
+                    📭
+                  </div>
+
+                  <h2 className="mt-5 text-2xl font-black tracking-[-0.04em] text-[#06264a]">
+                    Şu an uygun iş talebi yok
+                  </h2>
+
+                  <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-slate-600">
+                    Filtreleri değiştirebilir veya daha sonra tekrar kontrol
+                    edebilirsiniz.
+                  </p>
+                </div>
+              )}
+
+              {!initialLoading && !error && jobRequests.length > 0 && (
+                <div className="grid gap-4">
+                  {jobRequests.map((job) => (
+                    <article
+                      key={job.id}
+                      className="rounded-[1.8rem] border border-slate-200 bg-slate-50 p-5 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-lg hover:shadow-slate-200/60 md:p-6"
+                    >
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+                              Açık Talep
+                            </span>
+
+                            <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-[#b86b00]">
+                              {job.service_type}
+                            </span>
+
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 ring-1 ring-slate-200">
+                              #{job.id}
+                            </span>
+                          </div>
+
+                          <h2 className="mt-4 text-2xl font-black tracking-[-0.04em] text-[#06264a]">
+                            {job.title}
+                          </h2>
+
+                          {job.description && (
+                            <p className="mt-4 text-sm leading-7 text-slate-600">
+                              {job.description}
+                            </p>
+                          )}
+
+                          <div className="mt-5 grid gap-3 text-sm text-slate-600 md:grid-cols-2">
+                            <div className="rounded-2xl bg-white p-4">
+                              <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                Konum
+                              </div>
+                              <div className="mt-2 font-black text-[#06264a]">
+                                {job.city?.name || "-"}
+                                {job.district?.name
+                                  ? ` / ${job.district.name}`
+                                  : ""}
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl bg-white p-4">
+                              <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                Tarih / Saat
+                              </div>
+                              <div className="mt-2 font-black text-[#06264a]">
+                                {job.work_date || "Tarih belirtilmedi"}
+                                {job.work_time ? ` - ${job.work_time}` : ""}
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl bg-white p-4">
+                              <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                Bütçe
+                              </div>
+                              <div className="mt-2 font-black text-[#06264a]">
+                                {job.budget || "Belirtilmedi"}
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl bg-white p-4">
+                              <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                Adres Detayı
+                              </div>
+                              <div className="mt-2 font-black text-[#06264a]">
+                                {job.address_detail || "Belirtilmedi"}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 rounded-[1.6rem] bg-[#06264a] p-5 text-white lg:w-80">
+                          <div className="text-xs font-black uppercase tracking-[0.18em] text-orange-200">
+                            Müşteri Bilgileri
+                          </div>
+
+                          <div className="mt-4 text-xl font-black">
+                            {job.customer?.name || "Müşteri"}
+                          </div>
+
+                          <div className="mt-4 grid gap-3">
+                            {job.customer?.phone && (
+                              <a
+                                href={`tel:${job.customer.phone}`}
+                                className="flex min-h-12 items-center justify-center rounded-full bg-[#f6a313] px-5 text-sm font-black text-white transition hover:bg-[#e58f00]"
+                              >
+                                Ara: {job.customer.phone}
+                              </a>
+                            )}
+
+                            {job.customer?.phone && (
+                              <a
+                                href={`https://wa.me/9${job.customer.phone.replace(
+                                  /\D/g,
+                                  ""
+                                )}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex min-h-12 items-center justify-center rounded-full bg-white px-5 text-sm font-black text-[#06264a] transition hover:bg-blue-50"
+                              >
+                                WhatsApp ile Yaz
+                              </a>
+                            )}
+
+                            {job.customer?.email && (
+                              <a
+                                href={`mailto:${job.customer.email}`}
+                                className="flex min-h-12 items-center justify-center rounded-full border border-white/20 px-5 text-sm font-black text-white transition hover:bg-white/10"
+                              >
+                                E-posta Gönder
+                              </a>
+                            )}
+                          </div>
+
+                          {!job.customer?.phone && !job.customer?.email && (
+                            <p className="mt-4 rounded-2xl bg-white/10 p-4 text-xs leading-6 text-blue-100">
+                              Bu talep için iletişim bilgisi henüz
+                              görüntülenemiyor.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -567,7 +623,9 @@ export default function JobRequestsPage() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    setUser(getAuthUser());
+    const authUser = getAuthUser();
+
+    setUser(authUser);
     setAuthChecked(true);
   }, []);
 
@@ -583,5 +641,9 @@ export default function JobRequestsPage() {
     return <CustomerView />;
   }
 
-  return <CleanerJobRequests />;
+  if (user.role === "cleaner") {
+    return <CleanerJobRequests />;
+  }
+
+  return <LockedJobRequests />;
 }

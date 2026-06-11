@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type SearchableSelectOption = {
   value: string;
@@ -24,6 +24,8 @@ export default function SearchableSelect({
   searchPlaceholder = "Ara...",
   disabled = false,
 }: SearchableSelectProps) {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -46,8 +48,26 @@ export default function SearchableSelect({
     setOpen(false);
   }
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+        setSearch("");
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   return (
-    <div className="relative">
+    <div ref={wrapperRef} className="relative">
       <button
         type="button"
         disabled={disabled}
@@ -56,9 +76,13 @@ export default function SearchableSelect({
             setOpen((current) => !current);
           }
         }}
-        className="flex min-h-12 w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 text-left text-sm font-bold text-slate-700 outline-none transition focus:border-[#f6a313] focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-left text-sm font-bold text-slate-700 outline-none transition hover:border-[#f6a313] focus:border-[#f6a313] focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <span className={selectedLabel ? "text-slate-800" : "text-slate-400"}>
+        <span
+          className={`line-clamp-1 ${
+            selectedLabel ? "text-slate-800" : "text-slate-400"
+          }`}
+        >
           {selectedLabel || placeholder}
         </span>
 

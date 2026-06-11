@@ -1,6 +1,40 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getAuthUser } from "@/lib/auth";
 
 export default function RegisterChoicePage() {
+  const router = useRouter();
+
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    const user = getAuthUser();
+
+    if (!user) {
+      setAuthChecked(true);
+      return;
+    }
+
+    if (user.role === "cleaner") {
+      router.replace("/is-talepleri");
+      return;
+    }
+
+    if (user.role === "customer") {
+      router.replace("/temizlikci-bul");
+      return;
+    }
+
+    router.replace("/");
+  }, [router]);
+
+  if (!authChecked) {
+    return null;
+  }
+
   return (
     <main className="page-bottom-space py-8 md:py-14">
       <div className="container-main">

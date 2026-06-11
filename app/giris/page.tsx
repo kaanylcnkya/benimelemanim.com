@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { saveAuth, type AuthResponse } from "@/lib/auth";
+import { getAuthUser, saveAuth, type AuthResponse } from "@/lib/auth";
 
 type ApiValidationError = {
   message?: string;
@@ -14,6 +14,8 @@ type ApiValidationError = {
 export default function LoginPage() {
   const router = useRouter();
 
+  const [authChecked, setAuthChecked] = useState(false);
+
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
@@ -21,6 +23,27 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    const user = getAuthUser();
+
+    if (!user) {
+      setAuthChecked(true);
+      return;
+    }
+
+    if (user.role === "cleaner") {
+      router.replace("/is-talepleri");
+      return;
+    }
+
+    if (user.role === "customer") {
+      router.replace("/temizlikci-bul");
+      return;
+    }
+
+    router.replace("/");
+  }, [router]);
 
   function getFieldError(field: string) {
     return fieldErrors[field]?.[0];
@@ -45,9 +68,11 @@ export default function LoginPage() {
       saveAuth(response.token, response.user);
 
       if (response.user.role === "cleaner") {
-        router.push("/is-talepleri");
+        router.replace("/is-talepleri");
+      } else if (response.user.role === "customer") {
+        router.replace("/temizlikci-bul");
       } else {
-        router.push("/temizlikci-bul");
+        router.replace("/");
       }
 
       router.refresh();
@@ -59,6 +84,10 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!authChecked) {
+    return null;
   }
 
   return (
@@ -129,13 +158,13 @@ export default function LoginPage() {
               <form onSubmit={handleSubmit} className="mt-7 space-y-4">
                 <label className="block">
                   <span className="mb-2 block text-sm font-black text-slate-700">
-                    Telefon veya E-posta
+                    E-posta
                   </span>
                   <input
                     type="text"
                     value={login}
                     onChange={(e) => setLogin(e.target.value)}
-                    placeholder="05xx xxx xx xx veya e-posta"
+                    placeholder="E-posta"
                     className="min-h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold outline-none transition focus:border-[#f6a313] focus:bg-white"
                   />
                   {getFieldError("login") && (
@@ -181,7 +210,8 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="min-h-14 w-full cursor-pointer rounded-full bg-[#06264a] px-6 font-black text-white shadow-lg shadow-blue-950/20 transition hover:bg-[#0b355f] disabled:cursor-not-allowed disabled:opacity-60"                >
+                  className="min-h-14 w-full cursor-pointer rounded-full bg-[#06264a] px-6 font-black text-white shadow-lg shadow-blue-950/20 transition hover:bg-[#0b355f] disabled:cursor-not-allowed disabled:opacity-60"
+                >
                   {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
                 </button>
               </form>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { saveAuth, type AuthResponse } from "@/lib/auth";
+import { getAuthUser, saveAuth, type AuthResponse } from "@/lib/auth";
 import { getCities, getDistricts, type City, type District } from "@/lib/locations";
 
 type ApiValidationError = {
@@ -14,6 +14,8 @@ type ApiValidationError = {
 
 export default function CustomerRegisterPage() {
   const router = useRouter();
+
+  const [authChecked, setAuthChecked] = useState(false);
 
   const [cities, setCities] = useState<City[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
@@ -35,6 +37,29 @@ export default function CustomerRegisterPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
+    const user = getAuthUser();
+
+    if (!user) {
+      setAuthChecked(true);
+      return;
+    }
+
+    if (user.role === "cleaner") {
+      router.replace("/is-talepleri");
+      return;
+    }
+
+    if (user.role === "customer") {
+      router.replace("/temizlikci-bul");
+      return;
+    }
+
+    router.replace("/");
+  }, [router]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+
     async function loadCities() {
       try {
         setCityLoading(true);
@@ -48,7 +73,7 @@ export default function CustomerRegisterPage() {
     }
 
     loadCities();
-  }, []);
+  }, [authChecked]);
 
   useEffect(() => {
     async function loadDistricts() {
@@ -101,7 +126,7 @@ export default function CustomerRegisterPage() {
 
       saveAuth(response.token, response.user);
 
-      router.push("/temizlikci-bul");
+      router.replace("/temizlikci-bul");
       router.refresh();
     } catch (err) {
       const apiError = err as ApiValidationError;
@@ -111,6 +136,10 @@ export default function CustomerRegisterPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!authChecked) {
+    return null;
   }
 
   return (
@@ -233,7 +262,7 @@ export default function CustomerRegisterPage() {
 
                 <label>
                   <span className="mb-2 block text-sm font-black text-slate-700">
-                    Telefon Tekrarı / Şifre
+                    Şifre
                   </span>
                   <input
                     value={password}
@@ -329,6 +358,7 @@ export default function CustomerRegisterPage() {
                   Şartları’nı okudum, kabul ediyorum.
                 </span>
               </label>
+
               {getFieldError("kvkk_accepted") && (
                 <p className="mt-2 text-xs font-bold text-red-600">
                   {getFieldError("kvkk_accepted")}
@@ -338,7 +368,7 @@ export default function CustomerRegisterPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-6 min-h-14 w-full rounded-full bg-[#f6a313] px-6 font-black text-white shadow-lg shadow-orange-400/25 transition hover:bg-[#e58f00] disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-6 min-h-14 w-full cursor-pointer rounded-full bg-[#f6a313] px-6 font-black text-white shadow-lg shadow-orange-400/25 transition hover:bg-[#e58f00] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "Kayıt oluşturuluyor..." : "Kullanıcı Olarak Üye Ol"}
               </button>

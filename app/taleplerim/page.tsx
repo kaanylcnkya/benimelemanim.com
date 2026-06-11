@@ -3,8 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthUser } from "@/lib/auth";
+import { clearAuth, getAuthUser } from "@/lib/auth";
 import { getMyJobRequests, type JobRequest } from "@/lib/jobRequests";
+
+type ApiError = {
+  status?: number;
+  message?: string;
+};
 
 function getStatusLabel(status: string) {
   if (status === "open") return "Yayında";
@@ -32,24 +37,37 @@ function getStatusClass(status: string) {
 export default function MyJobRequestsPage() {
   const router = useRouter();
 
+  const [authChecked, setAuthChecked] = useState(false);
   const [jobRequests, setJobRequests] = useState<JobRequest[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const user = getAuthUser();
+
+    if (!user) {
+      router.replace("/giris");
+      return;
+    }
+
+    if (user.role === "cleaner") {
+      router.replace("/is-talepleri");
+      return;
+    }
+
+    if (user.role !== "customer") {
+      router.replace("/");
+      return;
+    }
+
+    setAuthChecked(true);
+  }, [router]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+
     async function loadMyRequests() {
-      const user = getAuthUser();
-
-      if (!user) {
-        router.push("/giris");
-        return;
-      }
-
-      if (user.role !== "customer") {
-        router.push("/is-talepleri");
-        return;
-      }
-
       try {
         setLoading(true);
         setError("");
@@ -57,15 +75,29 @@ export default function MyJobRequestsPage() {
         const response = await getMyJobRequests();
 
         setJobRequests(response.data);
-      } catch {
-        setError("Talepleriniz yüklenemedi. Lütfen tekrar deneyin.");
+      } catch (err) {
+        const apiError = err as ApiError;
+
+        if (apiError.status === 401) {
+          clearAuth();
+          router.replace("/giris");
+          return;
+        }
+
+        setError(
+          apiError.message || "Talepleriniz yüklenemedi. Lütfen tekrar deneyin."
+        );
       } finally {
         setLoading(false);
       }
     }
 
     loadMyRequests();
-  }, [router]);
+  }, [authChecked, router]);
+
+  if (!authChecked) {
+    return null;
+  }
 
   return (
     <main className="page-bottom-space py-8 md:py-14">
@@ -162,10 +194,6 @@ export default function MyJobRequestsPage() {
                           >
                             {getStatusLabel(job.status)}
                           </span>
-
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 ring-1 ring-slate-200">
-                            #{job.id}
-                          </span>
                         </div>
 
                         <h2 className="mt-4 text-2xl font-black tracking-[-0.04em] text-[#06264a]">
@@ -193,7 +221,9 @@ export default function MyJobRequestsPage() {
                             <span className="font-bold">Konum</span>
                             <span className="text-right font-black text-slate-700">
                               {job.city?.name || "-"}
-                              {job.district?.name ? ` / ${job.district.name}` : ""}
+                              {job.district?.name
+                                ? ` / ${job.district.name}`
+                                : ""}
                             </span>
                           </div>
 
