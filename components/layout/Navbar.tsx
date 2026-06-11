@@ -172,26 +172,17 @@ export default function Navbar() {
           }`}
         >
           <div className="flex items-center justify-between gap-3">
-            <Link
-              href="/"
-              onClick={() => setOpen(false)}
-              className="flex min-w-0 shrink-0 items-center gap-2.5"
-            >
-              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#06264a] shadow-lg shadow-blue-950/20">
-                <span className="text-sm font-black text-white">BE</span>
-                <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full border-2 border-white bg-[#f6a313]" />
-              </div>
-
-              <div className="min-w-0 leading-none">
-                <div className="max-w-[150px] truncate text-[17px] font-black tracking-[-0.04em] text-[#06264a] sm:max-w-none sm:text-[20px]">
-                  BenimElemanım
-                </div>
-
-                <div className="mt-1 hidden whitespace-nowrap text-[10px] font-black uppercase tracking-[0.24em] text-slate-400 sm:block">
-                  Cleaning Service
-                </div>
-              </div>
-            </Link>
+          <Link
+            href="/"
+            onClick={() => setOpen(false)}
+            className="flex min-w-0 shrink-0 items-center"
+          >
+            <img
+              src="/brand/logo-primary.png"
+              alt="BenimElemanım"
+              className="h-12 w-auto max-w-[210px] object-contain sm:h-14 sm:max-w-[260px]"
+            />
+          </Link>
 
             <nav className="hidden min-w-0 flex-1 justify-center xl:flex">
               <div className="flex items-center gap-1 rounded-full bg-slate-50 p-1">
