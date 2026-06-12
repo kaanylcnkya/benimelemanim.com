@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -19,6 +18,57 @@ import {
 import PageLoader from "@/components/ui/PageLoader";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 
+type PreviewCleaner = {
+  id: number;
+  name: string;
+  city: { name: string };
+  district: { name: string };
+  description: string;
+  experience: string;
+  daily_price: string;
+  services: string[];
+  phone: string;
+};
+
+const previewCleaners: PreviewCleaner[] = [
+  {
+    id: 9001,
+    name: "Ayşe Yılmaz",
+    city: { name: "İstanbul" },
+    district: { name: "Kadıköy" },
+    description:
+      "Ev temizliği, düzenli temizlik ve detaylı temizlik alanlarında deneyimlidir.",
+    experience: "4 yıl deneyim",
+    daily_price: "1.000 TL - 1.300 TL",
+    services: ["Ev Temizliği", "Düzenli Temizlik", "Detaylı Temizlik"],
+    phone: "05xx xxx xx xx",
+  },
+  {
+    id: 9002,
+    name: "Fatma Demir",
+    city: { name: "İstanbul" },
+    district: { name: "Üsküdar" },
+    description:
+      "Günlük temizlik, ofis temizliği ve taşınma sonrası temizlik hizmeti verebilir.",
+    experience: "6 yıl deneyim",
+    daily_price: "Görüşülür",
+    services: ["Ofis Temizliği", "Günlük Temizlik", "Taşınma Temizliği"],
+    phone: "05xx xxx xx xx",
+  },
+  {
+    id: 9003,
+    name: "Emine Kaya",
+    city: { name: "Ankara" },
+    district: { name: "Çankaya" },
+    description:
+      "Haftalık düzenli temizlik ve detaylı ev temizliği taleplerine uygundur.",
+    experience: "3 yıl deneyim",
+    daily_price: "900 TL - 1.200 TL",
+    services: ["Ev Temizliği", "Haftalık Temizlik", "Cam Temizliği"],
+    phone: "05xx xxx xx xx",
+  },
+];
+
 function getInitials(name: string) {
   return name
     .split(" ")
@@ -28,53 +78,35 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
-function LockedContactBox() {
+function LockedCleanerCardOverlay() {
   return (
-    <div className="relative overflow-hidden rounded-[1.4rem] bg-[#06264a] p-5 text-white">
-      <div className="pointer-events-none select-none blur-[4px]">
-        <div className="text-xs font-black uppercase tracking-[0.18em] text-orange-200">
-          İletişim Bilgileri
-        </div>
-
-        <div className="mt-4 text-lg font-black">05xx xxx xx xx</div>
-
-        <div className="mt-4 grid gap-2">
-          <div className="flex min-h-11 items-center justify-center rounded-full bg-[#f6a313] px-4 text-sm font-black text-white">
-            Ara
-          </div>
-
-          <div className="flex min-h-11 items-center justify-center rounded-full bg-white px-4 text-sm font-black text-[#06264a]">
-            WhatsApp ile Yaz
-          </div>
-        </div>
-      </div>
-
-      <div className="absolute inset-0 flex items-center justify-center bg-[#06264a]/55 backdrop-blur-[1px]">
-        <div className="mx-3 rounded-[1.2rem] bg-white p-4 text-center shadow-2xl">
-          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#06264a] text-white">
+    <div className="absolute inset-0 z-30 rounded-[inherit] bg-white/10 backdrop-blur-[2px]">
+      <div className="absolute inset-y-0 left-1/2 flex w-full max-w-[450px] -translate-x-1/2 items-center justify-center bg-white/92 px-5 shadow-[0_0_80px_rgba(15,23,42,0.12)] backdrop-blur-md">
+        <div className="w-full text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#06264a] text-xl text-white shadow-lg shadow-blue-950/20">
             🔒
           </div>
 
-          <div className="mt-3 text-sm font-black text-[#06264a]">
-            İletişim kilitli
-          </div>
+          <h3 className="mt-4 text-xl font-black tracking-[-0.04em] text-[#06264a]">
+            Detaylar Kilitli
+          </h3>
 
-          <p className="mt-2 text-xs leading-5 text-slate-600">
-            Telefon ve WhatsApp bilgilerini görmek için müşteri hesabıyla giriş
-            yapın.
+          <p className="mx-auto mt-3 max-w-[340px] text-sm font-bold leading-7 text-slate-600">
+            Temizlikçi profillerini, telefon ve WhatsApp bilgilerini görmek için
+            müşteri hesabıyla giriş yapın.
           </p>
 
-          <div className="mt-3 grid gap-2">
+          <div className="mx-auto mt-5 grid max-w-[360px] grid-cols-2 gap-3">
             <Link
               href="/giris"
-              className="rounded-full bg-[#f6a313] px-4 py-2 text-xs font-black text-white"
+              className="flex min-h-12 items-center justify-center rounded-full bg-[#06264a] px-5 text-sm font-black text-white shadow-lg shadow-blue-950/15 transition hover:-translate-y-0.5 hover:bg-[#0b355f]"
             >
               Giriş Yap
             </Link>
 
             <Link
               href="/kullanici-kayit"
-              className="rounded-full bg-[#06264a] px-4 py-2 text-xs font-black text-white"
+              className="flex min-h-12 items-center justify-center rounded-full bg-[#f6a313] px-5 text-sm font-black text-white shadow-lg shadow-orange-400/25 transition hover:-translate-y-0.5 hover:bg-[#e58f00]"
             >
               Üye Ol
             </Link>
@@ -86,6 +118,8 @@ function LockedContactBox() {
 }
 
 function CustomerContactBox({ cleaner }: { cleaner: Cleaner }) {
+  const cleanPhone = cleaner.phone?.replace(/\D/g, "") || "";
+
   return (
     <div className="rounded-[1.4rem] bg-[#06264a] p-5 text-white">
       <div className="text-xs font-black uppercase tracking-[0.18em] text-orange-200">
@@ -99,7 +133,7 @@ function CustomerContactBox({ cleaner }: { cleaner: Cleaner }) {
       <div className="mt-4 grid gap-2">
         {cleaner.phone && (
           <a
-            href={`tel:${cleaner.phone}`}
+            href={`tel:${cleanPhone}`}
             className="flex min-h-11 items-center justify-center rounded-full bg-[#f6a313] px-4 text-sm font-black text-white transition hover:bg-[#e58f00]"
           >
             Ara
@@ -108,7 +142,7 @@ function CustomerContactBox({ cleaner }: { cleaner: Cleaner }) {
 
         {cleaner.phone && (
           <a
-            href={`https://wa.me/9${cleaner.phone.replace(/\D/g, "")}`}
+            href={`https://wa.me/9${cleanPhone}`}
             target="_blank"
             rel="noreferrer"
             className="flex min-h-11 items-center justify-center rounded-full bg-white px-4 text-sm font-black text-[#06264a] transition hover:bg-blue-50"
@@ -125,6 +159,28 @@ function CustomerContactBox({ cleaner }: { cleaner: Cleaner }) {
             E-posta Gönder
           </a>
         )}
+      </div>
+    </div>
+  );
+}
+
+function PreviewContactBox({ phone }: { phone: string }) {
+  return (
+    <div className="rounded-[1.4rem] bg-[#06264a] p-5 text-white">
+      <div className="text-xs font-black uppercase tracking-[0.18em] text-orange-200">
+        İletişim Bilgileri
+      </div>
+
+      <div className="mt-4 text-lg font-black">{phone}</div>
+
+      <div className="mt-4 grid gap-2">
+        <div className="flex min-h-11 items-center justify-center rounded-full bg-[#f6a313] px-4 text-sm font-black text-white">
+          Ara
+        </div>
+
+        <div className="flex min-h-11 items-center justify-center rounded-full bg-white px-4 text-sm font-black text-[#06264a]">
+          WhatsApp ile Yaz
+        </div>
       </div>
     </div>
   );
@@ -305,9 +361,7 @@ export default function FindCleanerPage() {
     async function loadCities() {
       try {
         setCityLoading(true);
-
         const response = await getCities();
-
         setCities(response.data);
       } catch {
         setError("İl listesi yüklenemedi.");
@@ -331,14 +385,11 @@ export default function FindCleanerPage() {
         setDistrictLoading(true);
 
         const currentDistrictId = districtId;
-
         const response = await getDistricts(cityId);
 
         setDistricts(response.data);
 
-        if (!currentDistrictId) {
-          return;
-        }
+        if (!currentDistrictId) return;
 
         const districtExists = response.data.some(
           (district) => String(district.id) === String(currentDistrictId)
@@ -360,6 +411,8 @@ export default function FindCleanerPage() {
   }, [cityId]);
 
   const canSeeContact = user?.role === "customer";
+  const shouldShowPreviewCards =
+    !initialLoading && !error && cleaners.length === 0 && !canSeeContact;
 
   return (
     <main className="page-bottom-space py-8 md:py-14">
@@ -482,31 +535,125 @@ export default function FindCleanerPage() {
                 </div>
               )}
 
-              {!initialLoading && !error && cleaners.length === 0 && (
-                <div className="rounded-[1.8rem] bg-white p-8 text-center shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-orange-50 text-2xl">
-                    🧹
+              {shouldShowPreviewCards && (
+                <>
+                  <div className="mb-4 rounded-[1.4rem] border border-slate-200 bg-white px-5 py-4 text-sm font-bold text-slate-600 shadow-[0_18px_60px_rgba(15,23,42,0.05)]">
+                    Bölgenizdeki temizlikçileri görmek için ücretsiz üye olun.
                   </div>
 
-                  <h2 className="mt-5 text-2xl font-black tracking-[-0.04em] text-[#06264a]">
-                    Uygun temizlikçi bulunamadı
-                  </h2>
+                  <div className="grid gap-4">
+                    {previewCleaners.map((cleaner) => (
+                      <article
+                        key={cleaner.id}
+                        className="relative overflow-hidden rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)] md:p-6"
+                      >
+                        <div className="pointer-events-none select-none opacity-45 blur-[5px] transition duration-300 lg:flex lg:items-start lg:justify-between lg:gap-5">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-[#06264a] text-xl font-black text-white">
+                                {getInitials(cleaner.name)}
+                              </div>
 
-                  <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-slate-600">
-                    Filtreleri değiştirebilir veya talep oluşturarak
-                    temizlikçilerin size ulaşmasını sağlayabilirsiniz.
-                  </p>
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h2 className="text-2xl font-black tracking-[-0.04em] text-[#06264a]">
+                                    {cleaner.name}
+                                  </h2>
 
-                  {user?.role === "customer" && (
+                                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">
+                                    Onaylı
+                                  </span>
+                                </div>
+
+                                <p className="mt-2 text-sm font-black text-[#f6a313]">
+                                  {cleaner.city.name} / {cleaner.district.name}
+                                </p>
+
+                                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
+                                  {cleaner.description}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="mt-5 grid gap-3 text-sm md:grid-cols-3">
+                              <div className="rounded-2xl bg-slate-50 p-4">
+                                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                  Deneyim
+                                </div>
+                                <div className="mt-2 font-black text-[#06264a]">
+                                  {cleaner.experience}
+                                </div>
+                              </div>
+
+                              <div className="rounded-2xl bg-slate-50 p-4">
+                                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                  Günlük Ücret
+                                </div>
+                                <div className="mt-2 font-black text-[#06264a]">
+                                  {cleaner.daily_price}
+                                </div>
+                              </div>
+
+                              <div className="rounded-2xl bg-slate-50 p-4">
+                                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                  Hizmet Sayısı
+                                </div>
+                                <div className="mt-2 font-black text-[#06264a]">
+                                  {cleaner.services.length}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-5 flex flex-wrap gap-2">
+                              {cleaner.services.map((service) => (
+                                <span
+                                  key={service}
+                                  className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-[#b86b00] ring-1 ring-orange-100"
+                                >
+                                  {service}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="mt-5 shrink-0 lg:mt-0 lg:w-80">
+                            <PreviewContactBox phone={cleaner.phone} />
+                          </div>
+                        </div>
+
+                        <LockedCleanerCardOverlay />
+                      </article>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {!initialLoading &&
+                !error &&
+                cleaners.length === 0 &&
+                canSeeContact && (
+                  <div className="rounded-[1.8rem] bg-white p-8 text-center shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-orange-50 text-2xl">
+                      🧹
+                    </div>
+
+                    <h2 className="mt-5 text-2xl font-black tracking-[-0.04em] text-[#06264a]">
+                      Uygun temizlikçi bulunamadı
+                    </h2>
+
+                    <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-slate-600">
+                      Filtreleri değiştirebilir veya talep oluşturarak
+                      temizlikçilerin size ulaşmasını sağlayabilirsiniz.
+                    </p>
+
                     <Link
                       href="/talep-olustur"
                       className="mt-6 inline-flex min-h-12 items-center justify-center rounded-full bg-[#f6a313] px-6 text-sm font-black text-white"
                     >
                       Talep Oluştur
                     </Link>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
 
               {!initialLoading && !error && cleaners.length > 0 && (
                 <>
@@ -536,9 +683,15 @@ export default function FindCleanerPage() {
                     {cleaners.map((cleaner) => (
                       <article
                         key={cleaner.id}
-                        className="rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-200/70 md:p-6"
+                        className="relative overflow-hidden rounded-[1.8rem] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-200/70 md:p-6"
                       >
-                        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div
+                          className={`flex flex-col gap-5 transition duration-300 lg:flex-row lg:items-start lg:justify-between ${
+                            canSeeContact
+                              ? "blur-0"
+                              : "pointer-events-none select-none opacity-45 blur-[5px]"
+                          }`}
+                        >
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-[#06264a] text-xl font-black text-white">
@@ -578,6 +731,7 @@ export default function FindCleanerPage() {
                                 <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
                                   Deneyim
                                 </div>
+
                                 <div className="mt-2 font-black text-[#06264a]">
                                   {cleaner.cleaner_profile?.experience ||
                                     "Belirtilmedi"}
@@ -588,6 +742,7 @@ export default function FindCleanerPage() {
                                 <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
                                   Günlük Ücret
                                 </div>
+
                                 <div className="mt-2 font-black text-[#06264a]">
                                   {cleaner.cleaner_profile?.daily_price ||
                                     "Belirtilmedi"}
@@ -598,6 +753,7 @@ export default function FindCleanerPage() {
                                 <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
                                   Hizmet Sayısı
                                 </div>
+
                                 <div className="mt-2 font-black text-[#06264a]">
                                   {cleaner.cleaner_profile?.services?.length ||
                                     0}
@@ -623,13 +779,11 @@ export default function FindCleanerPage() {
                           </div>
 
                           <div className="shrink-0 lg:w-80">
-                            {canSeeContact ? (
-                              <CustomerContactBox cleaner={cleaner} />
-                            ) : (
-                              <LockedContactBox />
-                            )}
+                            <CustomerContactBox cleaner={cleaner} />
                           </div>
                         </div>
+
+                        {!canSeeContact && <LockedCleanerCardOverlay />}
                       </article>
                     ))}
                   </div>
