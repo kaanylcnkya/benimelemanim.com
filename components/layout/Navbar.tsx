@@ -42,38 +42,77 @@ export default function Navbar() {
   const isLoggedIn = Boolean(user);
   const firstName = user?.name?.split(" ")?.[0] || "Hesabım";
 
-  const desktopLinks = useMemo<NavItem[]>((() => {
+  const desktopLinks = useMemo<NavItem[]>(() => {
     if (!user) {
       return [
-        { label: "Temizlikçi Bul", href: "/temizlikci-bul", variant: "primary" },
-        { label: "İş Talepleri", href: "/is-talepleri", variant: "secondary" },
+        {
+          label: "Temizlikçi Bul",
+          href: "/temizlikci-bul",
+          variant: "primary",
+        },
+        {
+          label: "İş Talepleri",
+          href: "/is-talepleri",
+          variant: "secondary",
+        },
       ];
     }
 
     if (user.role === "customer") {
       return [
-        { label: "Temizlikçi Bul", href: "/temizlikci-bul", variant: "primary" },
-        { label: "Talep Oluştur", href: "/talep-olustur", variant: "secondary" },
-        { label: "Taleplerim", href: "/taleplerim", variant: "secondary" },
+        {
+          label: "Temizlikçi Bul",
+          href: "/temizlikci-bul",
+          variant: "primary",
+        },
+        {
+          label: "Talep Oluştur",
+          href: "/talep-olustur",
+          variant: "secondary",
+        },
+        {
+          label: "Taleplerim",
+          href: "/taleplerim",
+          variant: "secondary",
+        },
       ];
     }
 
     if (user.role === "cleaner") {
       return [
-        { label: "İş Talepleri", href: "/is-talepleri", variant: "primary" },
-        { label: "Temizlikçi Bul", href: "/temizlikci-bul", variant: "secondary" },
+        {
+          label: "İş Talepleri",
+          href: "/is-talepleri",
+          variant: "primary",
+        },
       ];
     }
 
     return [
-      { label: "Temizlikçi Bul", href: "/temizlikci-bul", variant: "primary" },
-      { label: "İş Talepleri", href: "/is-talepleri", variant: "secondary" },
-      { label: "Talep Oluştur", href: "/talep-olustur", variant: "secondary" },
-      { label: "Taleplerim", href: "/taleplerim", variant: "secondary" },
+      {
+        label: "Temizlikçi Bul",
+        href: "/temizlikci-bul",
+        variant: "primary",
+      },
+      {
+        label: "İş Talepleri",
+        href: "/is-talepleri",
+        variant: "secondary",
+      },
+      {
+        label: "Talep Oluştur",
+        href: "/talep-olustur",
+        variant: "secondary",
+      },
+      {
+        label: "Taleplerim",
+        href: "/taleplerim",
+        variant: "secondary",
+      },
     ];
-  }) as () => NavItem[], [user]);
+  }, [user]);
 
-  const dropdownLinks = useMemo<NavItem[]>((() => {
+  const dropdownLinks = useMemo<NavItem[]>(() => {
     if (!user) return [];
 
     if (user.role === "customer") {
@@ -85,10 +124,7 @@ export default function Navbar() {
     }
 
     if (user.role === "cleaner") {
-      return [
-        { label: "İş Talepleri", href: "/is-talepleri" },
-        { label: "Temizlikçi Bul", href: "/temizlikci-bul" },
-      ];
+      return [{ label: "İş Talepleri", href: "/is-talepleri" }];
     }
 
     return [
@@ -97,7 +133,7 @@ export default function Navbar() {
       { label: "Talep Oluştur", href: "/talep-olustur" },
       { label: "Taleplerim", href: "/taleplerim" },
     ];
-  }) as () => NavItem[], [user]);
+  }, [user]);
 
   useEffect(() => {
     function loadUser() {
@@ -172,24 +208,28 @@ export default function Navbar() {
           }`}
         >
           <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/"
-            onClick={() => setOpen(false)}
-            className="flex min-w-0 shrink-0 items-center"
-          >
-            <img
-              src="/brand/logo-primary.png"
-              alt="BenimElemanım"
-              className="h-12 w-auto max-w-[210px] object-contain sm:h-14 sm:max-w-[260px]"
-            />
-          </Link>
+            <Link
+              href="/"
+              onClick={() => setOpen(false)}
+              className="flex min-w-0 shrink-0 items-center"
+            >
+              <img
+                src="/brand/logo-primary.png"
+                alt="BenimElemanım"
+                className="h-12 w-auto max-w-[210px] object-contain sm:h-14 sm:max-w-[260px]"
+              />
+            </Link>
 
             <nav className="hidden min-w-0 flex-1 justify-center xl:flex">
               <div className="flex items-center gap-1 rounded-full bg-slate-50 p-1">
                 {desktopLinks
                   .filter((item) => item.variant === "plain")
                   .map((item) => (
-                    <Link key={item.href} href={item.href} className={linkClass(item)}>
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={linkClass(item)}
+                    >
                       {item.label}
                     </Link>
                   ))}
@@ -218,7 +258,11 @@ export default function Navbar() {
               {desktopLinks
                 .filter((item) => item.variant !== "plain")
                 .map((item) => (
-                  <Link key={item.href} href={item.href} className={linkClass(item)}>
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={linkClass(item)}
+                  >
                     {item.label}
                     {item.variant === "primary" && (
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 transition group-hover:translate-x-0.5">
@@ -349,7 +393,6 @@ export default function Navbar() {
                     >
                       İş Talepleri
                     </Link>
-
                   </>
                 )}
 
@@ -360,7 +403,8 @@ export default function Navbar() {
                       href={item.href}
                       onClick={() => setOpen(false)}
                       className={`rounded-2xl px-4 py-3 text-center text-sm font-black ${
-                        item.href === "/is-talepleri" || item.href === "/temizlikci-bul"
+                        item.href === "/is-talepleri" ||
+                        item.href === "/temizlikci-bul"
                           ? "bg-[#06264a] text-white"
                           : "bg-slate-50 text-[#06264a]"
                       }`}
