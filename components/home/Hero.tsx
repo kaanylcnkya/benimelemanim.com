@@ -66,9 +66,7 @@ export default function Hero() {
       try {
         setDistrictLoading(true);
         setSelectedDistrict("");
-
         const response = await getDistricts(selectedCity);
-
         setDistricts(response.data);
       } catch {
         setDistricts([]);
@@ -80,47 +78,10 @@ export default function Hero() {
     loadDistricts();
   }, [selectedCity]);
 
-  const featuredCleaners = [
-    {
-      name: "Ayşe K.",
-      location: "Kadıköy",
-      rating: "4.8",
-      service: "Ev Temizliği",
-    },
-    {
-      name: "Fatma D.",
-      location: "Maltepe",
-      rating: "4.9",
-      service: "Ofis Temizliği",
-    },
-    {
-      name: "Zeynep A.",
-      location: "Çankaya",
-      rating: "4.7",
-      service: "Günlük Temizlik",
-    },
-  ];
-
-  const featuredJobs = [
-    {
-      title: "Ev temizliği talebi",
-      location: "Kadıköy",
-      budget: "1.200 TL",
-      time: "Bugün",
-    },
-    {
-      title: "Ofis temizliği talebi",
-      location: "Maltepe",
-      budget: "Görüşülür",
-      time: "Yarın",
-    },
-    {
-      title: "Düzenli temizlik talebi",
-      location: "Çankaya",
-      budget: "Haftalık",
-      time: "Yeni",
-    },
-  ];
+  const isCustomer = user?.role === "customer";
+  const isCleaner = user?.role === "cleaner";
+  const isAdmin = user?.role === "admin";
+  const isGuest = !user;
 
   const cityOptions = useMemo(
     () =>
@@ -151,44 +112,81 @@ export default function Hero() {
     return `/temizlikci-bul${query ? `?${query}` : ""}`;
   }, [selectedCity, selectedDistrict]);
 
-  const isCustomer = user?.role === "customer";
-  const isCleaner = user?.role === "cleaner";
-  const isAdmin = user?.role === "admin";
-  const isGuest = !user;
+  const cleanerJobs = [
+    {
+      title: "Ev temizliği talebi",
+      location: "Kadıköy",
+      badge: "Yeni",
+    },
+    {
+      title: "Ofis temizliği",
+      location: "Maltepe",
+      badge: "Bugün",
+    },
+    {
+      title: "Düzenli temizlik",
+      location: "Çankaya",
+      badge: "Haftalık",
+    },
+  ];
 
-  const heroBadge = isCleaner
-    ? "Temizlik işi arayanlar için"
-    : "Temizlik hizmeti almak isteyenler için";
+  const featuredCleaners = [
+    {
+      name: "Ayşe K.",
+      location: "Kadıköy",
+      service: "Ev Temizliği",
+      rating: "4.8",
+    },
+    {
+      name: "Fatma D.",
+      location: "Maltepe",
+      service: "Ofis Temizliği",
+      rating: "4.9",
+    },
+    {
+      name: "Zeynep A.",
+      location: "Çankaya",
+      service: "Günlük Temizlik",
+      rating: "4.7",
+    },
+  ];
 
-  const heroTitle = isCleaner
-    ? "Bölgenizdeki temizlik iş taleplerine ulaşın."
-    : "Temizlikçi arayanlarla temizlikçileri buluşturuyoruz.";
-
-  const heroText = isCleaner
-    ? "Temizlikçi hesabınızla bölgenizdeki açık iş taleplerini görüntüleyebilir, müşterilerle iletişime geçebilir ve daha fazla iş fırsatı yakalayabilirsiniz."
-    : "Temizlik hizmeti almak isteyenler il ve ilçesine göre temizlikçileri listeleyebilir. Temizlikçiler ise ücretsiz hesap oluşturarak iş taleplerine ulaşabilir.";
+  const heroContent = isCleaner
+    ? {
+        badge: "Temizlikçiler için",
+        title: "Bölgenizdeki temizlik işlerine hızlıca ulaşın.",
+        text: "Temizlikçi hesabınızla açık iş taleplerini görüntüleyebilir, müşterilerle iletişime geçebilir ve daha fazla iş fırsatı yakalayabilirsiniz.",
+      }
+    : {
+        badge: "Ücretsiz temizlik platformu",
+        title: "Temizlikçi arayanlarla temizlikçileri buluşturuyoruz.",
+        text: "Temizlik hizmeti almak isteyenler il ve ilçesine göre temizlikçileri listeleyebilir. Temizlikçiler ise ücretsiz hesap oluşturarak iş taleplerine ulaşabilir.",
+      };
 
   return (
-    <section className="relative overflow-hidden pb-12 pt-4 md:pb-20 md:pt-8">
-      <div className="container-main">
-        <div className="grid items-center gap-8 lg:grid-cols-[1fr_0.9fr]">
-          <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white px-4 py-2 shadow-sm">
+    <section className="relative overflow-hidden pb-12 pt-5 md:pb-20 md:pt-8">
+      <div className="pointer-events-none absolute -left-32 top-10 h-80 w-80 rounded-full bg-orange-100/70 blur-3xl" />
+      <div className="pointer-events-none absolute -right-32 top-40 h-96 w-96 rounded-full bg-blue-100/70 blur-3xl" />
+
+      <div className="container-main relative">
+        <div className="grid items-center gap-8 lg:grid-cols-[1.03fr_0.97fr] xl:gap-12">
+          <div className="max-w-3xl">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white/90 px-4 py-2 shadow-sm backdrop-blur">
               <span className="h-2 w-2 rounded-full bg-[#f6a313]" />
               <span className="text-xs font-black uppercase tracking-[0.14em] text-[#06264a] sm:text-sm">
-                {heroBadge}
+                {heroContent.badge}
               </span>
             </div>
 
-            <h1 className="text-balance text-[42px] font-black leading-[0.98] tracking-[-0.06em] text-[#06264a] sm:text-6xl lg:text-7xl">
-              {heroTitle}
+            <h1 className="text-balance text-[40px] font-black leading-[0.98] tracking-[-0.065em] text-[#06264a] sm:text-6xl lg:text-7xl">
+              {heroContent.title}
             </h1>
 
             <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-              {heroText}
+              {heroContent.text}
             </p>
 
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               {isGuest && (
                 <>
                   <Link
@@ -277,211 +275,189 @@ export default function Hero() {
             </div>
 
             <div className="mt-8 grid grid-cols-3 gap-3">
-              <div className="soft-card rounded-[1.4rem] p-4">
-                <div className="text-2xl font-black text-[#06264a]">
-                  Ücretsiz
+              {[
+                ["Ücretsiz", "Komisyon yok"],
+                ["Yerel", "İlçe bazlı"],
+                ["Hızlı", "Mobil uyumlu"],
+              ].map(([title, text]) => (
+                <div
+                  key={title}
+                  className="rounded-[1.4rem] border border-white/70 bg-white/80 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur"
+                >
+                  <div className="text-xl font-black text-[#06264a] sm:text-2xl">
+                    {title}
+                  </div>
+                  <div className="mt-1 text-xs font-bold text-slate-500 sm:text-sm">
+                    {text}
+                  </div>
                 </div>
-                <div className="mt-1 text-xs font-bold text-slate-500 sm:text-sm">
-                  Komisyon yok
-                </div>
-              </div>
-
-              <div className="soft-card rounded-[1.4rem] p-4">
-                <div className="text-2xl font-black text-[#06264a]">
-                  Yerel
-                </div>
-                <div className="mt-1 text-xs font-bold text-slate-500 sm:text-sm">
-                  İlçe bazlı
-                </div>
-              </div>
-
-              <div className="soft-card rounded-[1.4rem] p-4">
-                <div className="text-2xl font-black text-[#06264a]">
-                  Hızlı
-                </div>
-                <div className="mt-1 text-xs font-bold text-slate-500 sm:text-sm">
-                  Mobil uyumlu
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          <div className="clean-card rounded-[2rem] p-3 sm:p-4">
-            <div className="relative overflow-visible rounded-[1.7rem] bg-[#06264a] p-4 text-white sm:p-7">
-              <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[#f6a313]/25 blur-2xl" />
-              <div className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-blue-400/20 blur-2xl" />
+          <div className="rounded-[2.3rem] border border-white/70 bg-white/80 p-3 shadow-[0_22px_80px_rgba(15,23,42,0.10)] backdrop-blur md:p-4">
+            <div className="relative overflow-hidden rounded-[2rem] bg-[#06264a] p-4 text-white sm:p-6">
+              <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#f6a313]/25 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-blue-400/20 blur-3xl" />
 
-              <div className="relative">
-                {!isCleaner ? (
-                  <>
-                    <div className="rounded-[1.4rem] border border-white/10 bg-white/10 p-4 sm:p-5">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#f6a313] text-xl">
-                          🔎
-                        </div>
+              {!isCleaner ? (
+                <div className="relative">
+                  <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f6a313] text-2xl shadow-lg shadow-orange-400/20">
+                        🔎
+                      </div>
 
-                        <div>
-                          <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-200">
-                            Temizlik hizmeti al
-                          </p>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-200">
+                          Temizlik hizmeti al
+                        </p>
 
-                          <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
-                            Size yakın temizlikçileri listeleyin.
-                          </h2>
+                        <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
+                          Size yakın temizlikçileri listeleyin.
+                        </h2>
 
-                          <p className="mt-3 text-sm leading-7 text-blue-100">
-                            İl ve ilçe seçerek temizlikçi listesine hızlıca
-                            gidin.
-                          </p>
-                        </div>
+                        <p className="mt-3 text-sm leading-7 text-blue-100">
+                          İl ve ilçe seçerek temizlikçi listesine hızlıca
+                          gidin.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 rounded-[1.5rem] bg-white p-3 text-[#06264a] shadow-2xl shadow-blue-950/10 sm:p-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <label className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                          İl
+                        </label>
+
+                        <SearchableSelect
+                          value={selectedCity}
+                          onChange={(value) => {
+                            setSelectedCity(value);
+                            setSelectedDistrict("");
+                          }}
+                          options={cityOptions}
+                          placeholder={
+                            cityLoading ? "İller yükleniyor..." : "İl seçiniz"
+                          }
+                          searchPlaceholder="İl ara..."
+                          disabled={cityLoading}
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <label className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
+                          İlçe
+                        </label>
+
+                        <SearchableSelect
+                          value={selectedDistrict}
+                          onChange={setSelectedDistrict}
+                          options={districtOptions}
+                          placeholder={
+                            districtLoading
+                              ? "İlçeler yükleniyor..."
+                              : "İlçe seçiniz"
+                          }
+                          searchPlaceholder="İlçe ara..."
+                          disabled={!selectedCity || districtLoading}
+                        />
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-3 rounded-[1.4rem] bg-white p-3 text-[#06264a] shadow-2xl shadow-blue-950/10 sm:p-4">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                          <label className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                            İl
-                          </label>
-
-                          <SearchableSelect
-                            value={selectedCity}
-                            onChange={(value) => {
-                              setSelectedCity(value);
-                              setSelectedDistrict("");
-                            }}
-                            options={cityOptions}
-                            placeholder={
-                              cityLoading
-                                ? "İller yükleniyor..."
-                                : "İl seçiniz"
-                            }
-                            searchPlaceholder="İl ara..."
-                            disabled={cityLoading}
-                          />
-                        </div>
-
-                        <div className="grid gap-2">
-                          <label className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                            İlçe
-                          </label>
-
-                          <SearchableSelect
-                            value={selectedDistrict}
-                            onChange={setSelectedDistrict}
-                            options={districtOptions}
-                            placeholder={
-                              districtLoading
-                                ? "İlçeler yükleniyor..."
-                                : "İlçe seçiniz"
-                            }
-                            searchPlaceholder="İlçe ara..."
-                            disabled={!selectedCity || districtLoading}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <Link
-                          href={quickCleanerHref}
-                          className="flex min-h-14 items-center justify-center rounded-full bg-[#f6a313] px-6 py-4 text-center text-sm font-black text-white shadow-lg shadow-orange-400/25 transition hover:-translate-y-0.5 hover:bg-[#e58f00]"
-                        >
-                          Temizlikçi Listele
-                        </Link>
-
-                        {isCustomer ? (
-                          <Link
-                            href="/talep-olustur"
-                            className="flex min-h-14 items-center justify-center rounded-full bg-[#06264a] px-6 py-4 text-center text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-[#0b355f]"
-                          >
-                            Talep Oluştur
-                          </Link>
-                        ) : (
-                          <Link
-                            href="/kayit"
-                            className="flex min-h-14 items-center justify-center rounded-full bg-[#06264a] px-6 py-4 text-center text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-[#0b355f]"
-                          >
-                            Ücretsiz Üye Ol
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="rounded-[1.4rem] border border-white/10 bg-white/10 p-4 sm:p-5">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#f6a313] text-xl">
-                          💼
-                        </div>
-
-                        <div>
-                          <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-200">
-                            Temizlik işi bul
-                          </p>
-
-                          <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
-                            Açık iş taleplerine hızlıca ulaşın.
-                          </h2>
-
-                          <p className="mt-3 text-sm leading-7 text-blue-100">
-                            Bölgenizdeki temizlik taleplerini görün, uygun
-                            müşterilerle iletişime geçin.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 rounded-[1.4rem] bg-white p-3 text-[#06264a] shadow-2xl shadow-blue-950/10 sm:p-4">
-                      {featuredJobs.map((job) => (
-                        <div
-                          key={`${job.title}-${job.location}`}
-                          className="rounded-[1.2rem] border border-slate-100 bg-slate-50 p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="font-black text-[#06264a]">
-                                {job.title}
-                              </div>
-                              <div className="mt-1 text-xs font-bold text-slate-500">
-                                {job.location} • {job.time}
-                              </div>
-                            </div>
-
-                            <div className="shrink-0 rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-[#e58f00]">
-                              {job.budget}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
+                    <div className="grid gap-3 sm:grid-cols-2">
                       <Link
-                        href="/is-talepleri"
+                        href={quickCleanerHref}
                         className="flex min-h-14 items-center justify-center rounded-full bg-[#f6a313] px-6 py-4 text-center text-sm font-black text-white shadow-lg shadow-orange-400/25 transition hover:-translate-y-0.5 hover:bg-[#e58f00]"
                       >
-                        Tüm İş Taleplerini Gör
+                        Temizlikçi Listele
+                      </Link>
+
+                      <Link
+                        href={isCustomer ? "/talep-olustur" : "/kayit"}
+                        className="flex min-h-14 items-center justify-center rounded-full bg-[#06264a] px-6 py-4 text-center text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-[#0b355f]"
+                      >
+                        {isCustomer ? "Talep Oluştur" : "Ücretsiz Üye Ol"}
                       </Link>
                     </div>
-                  </>
-                )}
-              </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f6a313] text-2xl shadow-lg shadow-orange-400/20">
+                        💼
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-200">
+                          Temizlik işi bul
+                        </p>
+
+                        <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] sm:text-3xl">
+                          Açık iş taleplerine ulaşın.
+                        </h2>
+
+                        <p className="mt-3 text-sm leading-7 text-blue-100">
+                          Bölgenizdeki temizlik taleplerini görün, uygun
+                          müşterilerle iletişime geçin.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 rounded-[1.5rem] bg-white p-3 text-[#06264a] shadow-2xl shadow-blue-950/10 sm:p-4">
+                    {cleanerJobs.map((job) => (
+                      <div
+                        key={`${job.title}-${job.location}`}
+                        className="rounded-[1.2rem] border border-slate-100 bg-slate-50 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="font-black text-[#06264a]">
+                              {job.title}
+                            </div>
+                            <div className="mt-1 text-xs font-bold text-slate-500">
+                              {job.location}
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 rounded-full bg-orange-100 px-3 py-1 text-xs font-black text-[#e58f00]">
+                            {job.badge}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <Link
+                      href="/is-talepleri"
+                      className="flex min-h-14 items-center justify-center rounded-full bg-[#f6a313] px-6 py-4 text-center text-sm font-black text-white shadow-lg shadow-orange-400/25 transition hover:-translate-y-0.5 hover:bg-[#e58f00]"
+                    >
+                      Tüm İş Taleplerini Gör
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
 
             {!isCleaner ? (
               <div className="p-3">
-                <div className="mb-3 flex items-center justify-between">
+                <div className="mb-3 flex items-center justify-between gap-4">
                   <div>
                     <div className="text-sm font-black text-[#06264a]">
                       Öne çıkan temizlikçiler
                     </div>
                     <div className="mt-1 text-xs font-bold text-slate-500">
-                      Telefon için müşteri girişi gerekir
+                      Telefon bilgileri giriş sonrası görünür
                     </div>
                   </div>
 
                   <Link
                     href="/temizlikci-bul"
-                    className="text-xs font-black text-[#f6a313]"
+                    className="shrink-0 text-xs font-black text-[#f6a313]"
                   >
                     Tümünü Gör
                   </Link>
@@ -491,7 +467,7 @@ export default function Hero() {
                   {featuredCleaners.map((cleaner) => (
                     <div
                       key={cleaner.name}
-                      className="flex items-center justify-between gap-3 rounded-[1.2rem] bg-white p-4"
+                      className="flex items-center justify-between gap-3 rounded-[1.3rem] bg-white p-4 shadow-sm ring-1 ring-slate-100"
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#06264a] text-sm font-black text-white">
@@ -534,7 +510,7 @@ export default function Hero() {
                   ].map(([icon, title]) => (
                     <div
                       key={title}
-                      className="flex items-center gap-3 rounded-[1.2rem] bg-white p-4"
+                      className="flex items-center gap-3 rounded-[1.3rem] bg-white p-4 shadow-sm ring-1 ring-slate-100"
                     >
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xl">
                         {icon}
@@ -582,7 +558,7 @@ export default function Hero() {
           )}
 
           <Link
-            href={isCleaner || isGuest ? "/is-talepleri" : "/talep-olustur"}
+            href={isCustomer ? "/talep-olustur" : "/is-talepleri"}
             className="group relative overflow-hidden rounded-[1.8rem] bg-[#06264a] p-5 text-white shadow-xl shadow-blue-950/15 transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-950/20"
           >
             <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/10 transition group-hover:scale-125" />
