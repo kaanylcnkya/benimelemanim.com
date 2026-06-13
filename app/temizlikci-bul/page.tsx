@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getAuthUser, type AuthUser } from "@/lib/auth";
 import { services } from "@/lib/site";
 import {
@@ -196,6 +197,8 @@ const emptyMeta: CleanerPaginationMeta = {
 };
 
 export default function FindCleanerPage() {
+  const router = useRouter();
+
   const [user, setUser] = useState<AuthUser | null>(null);
 
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
@@ -330,8 +333,15 @@ export default function FindCleanerPage() {
   }
 
   useEffect(() => {
-    setUser(getAuthUser());
-  }, []);
+    const currentUser = getAuthUser();
+
+    if (currentUser?.role === "cleaner") {
+      router.replace("/is-talepleri");
+      return;
+    }
+
+    setUser(currentUser);
+  }, [router]);
 
   useEffect(() => {
     const params =
@@ -410,7 +420,8 @@ export default function FindCleanerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityId]);
 
-  const canSeeContact = user?.role === "customer";
+  const canSeeContact = user?.role === "customer" || user?.role === "admin";
+
   const shouldShowPreviewCards =
     !initialLoading && !error && cleaners.length === 0 && !canSeeContact;
 
